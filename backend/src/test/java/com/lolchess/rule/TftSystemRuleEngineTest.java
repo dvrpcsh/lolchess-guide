@@ -34,7 +34,8 @@ class TftSystemRuleEngineTest {
     @Test
     void 레벨별_상점_확률을_반환하고_각_레벨의_합은_100이다() {
         assertThat(engine.getShopProbability(7, 1)).isEqualTo(19);
-        assertThat(engine.getShopProbability(7, 3)).isEqualTo(35);
+        assertThat(engine.getShopProbability(7, 3)).isEqualTo(40);
+        assertThat(engine.getShopProbability(9, 5)).isEqualTo(15);
         assertThat(engine.getShopProbability(7, 5)).isEqualTo(1);
         for (int level = 1; level <= 10; level++) {
             int sum = 0;
