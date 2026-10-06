@@ -223,13 +223,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outl
 
 /* ---------- HEX 체스판 + 벤치 ---------- */
 .board-panel {
-  --hex-w: 64px;
+  --hex-w: 80px;
   --hex-h: calc(var(--hex-w) * 1.1547); /* 꼭짓점이 위아래인 정육각형 높이 */
   --hex-gap: 4px;
   --hex-shape: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
   width: max-content; max-width: 100%;
 }
-@media (max-width: 600px) { .board-panel { --hex-w: 40px; } }
+@media (max-width: 600px) { .board-panel { --hex-w: 44px; } }
 .board-header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .board-count { font-size: 0.8rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
 
@@ -257,12 +257,46 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outl
 .placed-unit:active { cursor: grabbing; }
 .placed-unit .champion-icon { box-shadow: none; border-radius: 0; }
 .placed-name {
-  position: absolute; left: 0; right: 0; bottom: 18%; padding: 1px 2px;
+  position: absolute; left: 0; right: 0; top: 40%; padding: 1px 2px;
   background: rgba(11, 15, 23, 0.75); color: var(--text-strong);
   font-size: 0.6rem; font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.bench-slot .placed-name { bottom: 0; }
-@media (max-width: 600px) { .placed-name { display: none; } }
+.bench-slot .placed-name { display: none; } /* 벤치는 칸이 작아 이름 대신 툴팁으로 표시 */
+
+/* 성급 표식: 1성 동 / 2성 은 / 3성 금 */
+.unit-stars {
+  position: absolute; top: 9%; left: 50%; transform: translateX(-50%); z-index: 2;
+  padding: 0 4px; border: 0; border-radius: 4px; cursor: pointer;
+  background: rgba(11, 15, 23, 0.7); font-size: 0.7rem; line-height: 1.3; letter-spacing: -1px; white-space: nowrap;
+}
+.unit-stars.star-1 { color: #cd8a4f; }
+.unit-stars.star-2 { color: #d9e1ec; text-shadow: 0 0 4px rgba(217, 225, 236, 0.6); }
+.unit-stars.star-3 { color: #ffd257; text-shadow: 0 0 6px rgba(255, 210, 87, 0.8); }
+.unit-stars:hover { background: rgba(11, 15, 23, 0.95); }
+.bench-slot .unit-stars { top: 2px; font-size: 0.6rem; }
+
+/* 아이템 슬롯 3칸 (초상화 하단) */
+.unit-items {
+  position: absolute; top: 58%; left: 0; right: 0; z-index: 2;
+  display: flex; justify-content: center; gap: 2px;
+}
+.bench-slot .unit-items { top: auto; bottom: 2px; }
+.unit-item {
+  width: 18px; height: 18px; padding: 0; border-radius: 3px; overflow: hidden; flex: none;
+  border: 1px solid var(--gold-dim); background: rgba(11, 15, 23, 0.8);
+  font-size: 0.6rem; color: var(--text-strong);
+}
+button.unit-item { cursor: pointer; border-color: var(--gold); }
+button.unit-item:hover { outline: 1px solid var(--tier-s); }
+.unit-item img { width: 100%; height: 100%; display: block; }
+.unit-item.is-empty { border-style: dashed; border-color: rgba(138, 109, 51, 0.6); background: rgba(11, 15, 23, 0.45); }
+.bench-slot .unit-item { width: 14px; height: 14px; }
+
+@media (max-width: 600px) {
+  .placed-name { display: none; }
+  .unit-item { width: 11px; height: 11px; }
+  .unit-stars { font-size: 0.5rem; }
+}
 
 .bench {
   display: grid; grid-template-columns: repeat(9, 1fr); gap: 6px;
@@ -271,7 +305,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outl
 .bench-slot { aspect-ratio: 1; min-width: 0; border-radius: 8px; overflow: hidden; }
 .bench-slot::before { border-radius: 6px; }
 .bench-slot .placed-unit { border-radius: 5px; }
-.board-hint { margin: 12px 0 0; font-size: 0.75rem; color: var(--text-dim); max-width: 520px; }
+.board-hint { margin: 12px 0 0; font-size: 0.75rem; line-height: 1.6; color: var(--text-dim); max-width: 600px; }
 .board-hint b { color: var(--gold); font-weight: 600; }
 
 /* ---------- 우측 서랍 ---------- */
@@ -335,3 +369,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outl
 .codex-card:hover { border-color: var(--cost-color); }
 .codex-card:active { cursor: grabbing; }
 .codex-name { font-size: 0.7rem; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+
+.item-card.is-draggable { cursor: grab; }
+.item-card.is-draggable:active { cursor: grabbing; }

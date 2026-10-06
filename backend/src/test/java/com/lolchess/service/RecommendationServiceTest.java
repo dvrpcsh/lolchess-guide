@@ -1,5 +1,6 @@
 package com.lolchess.service;
 
+import com.lolchess.dto.PlacedUnitRequest;
 import com.lolchess.dto.RecommendRequest;
 import com.lolchess.dto.RecommendResponse;
 import com.lolchess.entity.ChampionEntity;
@@ -93,6 +94,38 @@ class RecommendationServiceTest {
         assertThat(sComp.interestWarnings()).isEmpty();
         assertThat(sComp.probabilityTips()).isEmpty();
         assertThat(sComp.roundTip()).isNull();
+    }
+
+    @Test
+    void 핵심_기물의_성급과_장착된_추천_아이템에_가중치를_준다() {
+        // 드레이븐 3성 + 무한의 대검 장착(덱 추천 아이템), 브랜드 2성 + 여신의 눈물 장착(추천 아님)
+        RecommendRequest request = new RecommendRequest(List.of(), List.of(), Map.of(), null, null, null, List.of(
+                new PlacedUnitRequest("드레이븐", 3, List.of("무한의 대검")),
+                new PlacedUnitRequest("브랜드", 2, List.of("여신의 눈물"))));
+
+        RecommendResponse sComp = service.recommend(request).get(0);
+
+        // 보유 2기 40 + 아이템(장착분 포함) 무한의 대검 15 + 성급 3성 25 + 2성 10 + 장착 무한의 대검 10 + S 10 = 110
+        assertThat(sComp.compName()).isEqualTo("S덱");
+        assertThat(sComp.matchScore()).isEqualTo(110);
+        assertThat(sComp.matchedItems()).containsExactly("무한의 대검");
+    }
+
+    @Test
+    void 아이템을_인벤토리에서_장착으로_옮겨도_보유_아이템_점수는_유지된다() {
+        RecommendRequest inInventory = new RecommendRequest(List.of(), List.of("아리"), Map.of("곡궁", 1));
+        RecommendRequest equippedOnOther = new RecommendRequest(List.of(), List.of(), Map.of(), null, null, null,
+                List.of(new PlacedUnitRequest("아리", 1, List.of("곡궁"))));
+
+        int before = scoreOf(service.recommend(inInventory), "A덱");
+        int after = scoreOf(service.recommend(equippedOnOther), "A덱");
+
+        // 아리는 A덱 핵심 기물이 아니므로 장착 가중치는 없고, 보유 아이템 점수(곡궁 15)만 동일하게 유지
+        assertThat(after).isEqualTo(before).isEqualTo(15 + 5);
+    }
+
+    private static int scoreOf(List<RecommendResponse> results, String compName) {
+        return results.stream().filter(r -> r.compName().equals(compName)).findFirst().orElseThrow().matchScore();
     }
 
     private static ChampionEntity champion(String name, int cost) {

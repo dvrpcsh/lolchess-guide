@@ -15,10 +15,12 @@ import java.util.Map;
  *
  * @param shopUnits    현재 상점에 뜬 기물 이름 목록 (최대 5개)
  * @param boardUnits   필드/벤치에 보유한 기물 이름 목록
- * @param itemCounts   보유 아이템 이름 -> 수량 (예: {"B.F. 대검": 1, "곡궁": 2})
+ * @param itemCounts   장착하지 않은(인벤토리) 보유 아이템 이름 -> 수량 (예: {"B.F. 대검": 1, "곡궁": 2})
  * @param currentLevel 현재 레벨 (1~10, 미입력 시 null -> 확률 피드백 생략)
  * @param currentGold  현재 보유 골드 (미입력 시 null -> 이자 피드백 생략)
  * @param currentStage 현재 스테이지 (예: "3-2", 미입력 시 null -> 라운드 피드백 생략)
+ * @param placedUnits  체스판/벤치 기물의 성급·장착 아이템 상세 (미전송 시 빈 목록 -> 성급/장착 가중치 없음)
+ *                     placedUnits의 기물 이름은 boardUnits에도 포함된 것으로 간주한다.
  */
 public record RecommendRequest(
         List<String> shopUnits,
@@ -26,17 +28,27 @@ public record RecommendRequest(
         Map<String, Integer> itemCounts,
         Integer currentLevel,
         Integer currentGold,
-        String currentStage
+        String currentStage,
+        List<PlacedUnitRequest> placedUnits
 ) {
     // 클라이언트가 필드를 생략해도 Service에서 null 체크 없이 다룰 수 있도록 빈 컬렉션으로 정규화
     public RecommendRequest {
         shopUnits = shopUnits != null ? shopUnits : List.of();
         boardUnits = boardUnits != null ? boardUnits : List.of();
         itemCounts = itemCounts != null ? itemCounts : Map.of();
+        placedUnits = placedUnits != null
+                ? placedUnits.stream().filter(u -> u != null && u.name() != null && !u.name().isBlank()).toList()
+                : List.of();
     }
 
     // 기존 호출부(기물/아이템만 사용)와의 호환용 생성자
     public RecommendRequest(List<String> shopUnits, List<String> boardUnits, Map<String, Integer> itemCounts) {
-        this(shopUnits, boardUnits, itemCounts, null, null, null);
+        this(shopUnits, boardUnits, itemCounts, null, null, null, null);
+    }
+
+    // 성급/장착 정보 없이 게임 상태까지 전달하는 호출부용 생성자
+    public RecommendRequest(List<String> shopUnits, List<String> boardUnits, Map<String, Integer> itemCounts,
+                            Integer currentLevel, Integer currentGold, String currentStage) {
+        this(shopUnits, boardUnits, itemCounts, currentLevel, currentGold, currentStage, null);
     }
 }

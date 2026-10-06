@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import ChampionIcon from './ChampionIcon'
-import { DRAG_TYPE_CODEX } from '../boardState'
+import { DRAG_TYPE_CODEX } from '../utils/boardState'
 
 const COSTS = [1, 2, 3, 4, 5]
 
