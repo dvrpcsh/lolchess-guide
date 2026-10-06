@@ -1,0 +1,44 @@
+# =====================================================================
+# TFT 덱 추천 애플리케이션 - 기본 설정
+#
+# [DB 비밀번호 설정 가이드]
+#   비밀번호는 절대 이 파일에 직접 적지 않는다. (Git에 커밋되기 때문)
+#   아래 두 방법 중 하나로 DB_PASSWORD 값을 주입한다.
+#     1) backend/.env 파일 생성 (gitignore 처리됨)
+#          DB_PASSWORD=내_MySQL_root_비밀번호
+#     2) OS 환경변수 / IntelliJ Run Configuration의 Environment variables에
+#          DB_PASSWORD=... 설정
+#   DB_USERNAME, DB_HOST, DB_PORT 도 같은 방식으로 덮어쓸 수 있다.
+#
+# [DB 생성]
+#   URL의 createDatabaseIfNotExist=true 옵션으로 tft_db 스키마가 없으면
+#   최초 접속 시 자동 생성된다. (root 계정 기준)
+# =====================================================================
+spring:
+  application:
+    name: lolchess
+
+  # backend/.env 파일이 있으면 읽어서 프로퍼티로 등록 (없어도 기동 가능)
+  config:
+    import: optional:file:.env[.properties]
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/tft_db?createDatabaseIfNotExist=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      # update: Entity 변경 사항을 기존 테이블에 반영 (개발용, 운영에서는 validate/none 권장)
+      ddl-auto: update
+    # 실행되는 SQL을 콘솔에 출력
+    show-sql: true
+    properties:
+      hibernate:
+        # 출력되는 SQL을 줄바꿈/들여쓰기하여 보기 좋게 표시
+        format_sql: true
+        # SQL에 어떤 JPQL에서 생성된 쿼리인지 주석 추가
+        use_sql_comments: true
+    # 뷰 렌더링 시점까지 영속성 컨텍스트를 열어두지 않음 (REST API 전용, 트랜잭션 범위 명확화)
+    open-in-view: false
