@@ -10,6 +10,7 @@
  *
  * 상태 구조: { board: (Unit|null)[28], bench: (Unit|null)[9] }
  *   Unit = { championId, starLevel: 1~3, items: [itemName|null, itemName|null, itemName|null] }
+ *   Loadout = { slots, itemCounts }  체스판 배치 + 장착하지 않은 인벤토리 아이템 수량 (App이 하나의 상태로 관리)
  *   board 인덱스 = row * 7 + col  (row 0 = 맨 윗줄)
  *   기물을 옮기거나 자리를 바꿀 때 Unit 객체째 이동하므로 성급과 장착 아이템이 함께 따라간다.
  */
@@ -128,6 +129,33 @@ export function collectPlacedUnits(slots, championsById) {
 
 export function countPlaced(slots, area) {
   return slots[area].filter(Boolean).length
+}
+
+/** 판세 초기화: 모든 기물·성급·장착 아이템과 인벤토리를 비운 빈 Loadout을 반환한다. */
+export function resetLoadout() {
+  return { slots: EMPTY_SLOTS, itemCounts: {} }
+}
+
+/** 체스판·벤치·인벤토리가 모두 비어 있는지 (판세 초기화 버튼 활성화 판단용) */
+export function isLoadoutEmpty({ slots, itemCounts }) {
+  return countPlaced(slots, 'board') === 0 && countPlaced(slots, 'bench') === 0 && Object.keys(itemCounts).length === 0
+}
+
+/**
+ * 인벤토리 아이템을 at 칸 기물에 장착한다.
+ * - 인벤토리에 1개 이상 있으면: 1개를 꺼내 장착 (인벤토리 -1, 장착 +1)
+ * - 인벤토리에 0개면: 그 자리에서 1개를 획득해 바로 장착한 것으로 처리 (획득 +1 -> 장착으로 이동, 인벤토리는 0 유지)
+ * 어느 경우든 보유 아이템 총량(인벤토리 + 장착)은 "실제로 가진 개수"와 같게 유지되어 추천 점수가 이중 계산되지 않는다.
+ * 빈 칸이거나 슬롯 3개가 꽉 찬 기물이면 그대로 반환한다.
+ */
+export function equipFromInventory(loadout, at, itemName) {
+  const { slots: nextSlots, equipped } = equipItem(loadout.slots, at, itemName)
+  if (!equipped) return loadout
+  const hasInInventory = (loadout.itemCounts[itemName] ?? 0) > 0
+  return {
+    slots: nextSlots,
+    itemCounts: hasInInventory ? takeItemFromInventory(loadout.itemCounts, itemName) : loadout.itemCounts,
+  }
 }
 
 /** 인벤토리 아이템 수량을 delta만큼 조절한다 (0~MAX_ITEM_COUNT). 0개가 되면 키를 제거한다. */

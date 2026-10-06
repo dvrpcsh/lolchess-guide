@@ -2,18 +2,18 @@ import { useEffect, useMemo, useState } from 'react'
 import { fetchChampions, fetchItems } from './api/client'
 import { INITIAL_GAME_STATE, toGameStateRequest } from './gameState'
 import {
-  EMPTY_SLOTS,
   addItemsToInventory,
   addToBench,
   adjustItemCount,
   collectBoardUnitNames,
   collectPlacedUnits,
   cycleStarLevel,
-  equipItem,
+  equipFromInventory,
+  isLoadoutEmpty,
   moveUnit,
   placeChampion,
   removeUnit,
-  takeItemFromInventory,
+  resetLoadout,
   unequipItem,
 } from './utils/boardState'
 import ChessBoard from './components/ChessBoard'
@@ -25,7 +25,6 @@ import GameStatePanel from './components/GameStatePanel'
 import RecommendationList from './components/RecommendationList'
 
 const SHOP_SIZE = 5
-const INITIAL_LOADOUT = { slots: EMPTY_SLOTS, itemCounts: {} }
 
 /**
  * [역할] 메인 페이지. 모든 입력 상태(체스판 배치·성급·장착 아이템, 상점, 인벤토리 아이템, 레벨/골드/스테이지)를
@@ -35,7 +34,9 @@ const INITIAL_LOADOUT = { slots: EMPTY_SLOTS, itemCounts: {} }
  *   최초 렌더 --> GET /api/v1/champions --> champions (도감·상점 자동완성·체스판 초상화가 공유)
  *            --> GET /api/v1/items     --> 재료 아이템 목록 (인벤토리 UI·체스판 장착 아이콘이 공유)
  *   - 서랍 > 기물 도감에서 드래그 --> ChessBoard drop --> slots 갱신
- *   - 서랍 > 아이템에서 드래그 --> 기물 위 drop --> slots에 장착 + itemCounts에서 1개 차감
+ *   - 서랍 > 아이템에서 드래그 --> 기물 위 drop --> equipFromInventory()로 장착
+ *       (인벤토리에 있으면 1개 차감, 0개면 즉시 획득해 장착한 것으로 처리)
+ *   - 체스판 "판세 초기화" --> resetLoadout()으로 기물·성급·장착 아이템·인벤토리 일괄 초기화
  *   - 장착 해제 / 기물 제거·교체 --> 장착돼 있던 아이템을 itemCounts로 반환
  *   - 서랍 > 상점 / 게임 상태 입력 --> 각 상태 갱신
  *   --> request { boardUnits(이름), placedUnits(이름·성급·장착 아이템), itemCounts(인벤토리), ... }
@@ -48,7 +49,7 @@ export default function App() {
   const [itemStatus, setItemStatus] = useState('loading') // loading | done | error
   // 체스판 배치와 인벤토리는 아이템 장착/반환으로 항상 함께 바뀌므로 하나의 상태로 관리한다.
   // 모든 갱신은 setLoadout(prev => ...) 형태로 이전 상태를 기준으로 계산해, 연속 이벤트에서도 값이 유실되지 않게 한다.
-  const [loadout, setLoadout] = useState(INITIAL_LOADOUT)
+  const [loadout, setLoadout] = useState(resetLoadout)
   const { slots, itemCounts } = loadout
   const [shopUnits, setShopUnits] = useState(Array(SHOP_SIZE).fill(''))
   const [gameState, setGameState] = useState(INITIAL_GAME_STATE)
@@ -95,11 +96,7 @@ export default function App() {
     return { slots: nextSlots, itemCounts: addItemsToInventory(prev.itemCounts, returnedItems) }
   })
 
-  const handleEquip = (at, itemName) => setLoadout((prev) => {
-    if ((prev.itemCounts[itemName] ?? 0) < 1) return prev // 인벤토리에 없는 아이템은 장착 불가
-    const { slots: nextSlots, equipped } = equipItem(prev.slots, at, itemName)
-    return equipped ? { slots: nextSlots, itemCounts: takeItemFromInventory(prev.itemCounts, itemName) } : prev
-  })
+  const handleEquip = (at, itemName) => setLoadout((prev) => equipFromInventory(prev, at, itemName))
 
   const handleUnequip = (at, itemIndex) => updateSlotsReturningItems((prevSlots) => {
     const { slots: nextSlots, returnedItem } = unequipItem(prevSlots, at, itemIndex)
@@ -107,7 +104,7 @@ export default function App() {
   })
 
   const resetAll = () => {
-    setLoadout(INITIAL_LOADOUT)
+    setLoadout(resetLoadout())
     setShopUnits(Array(SHOP_SIZE).fill(''))
     setGameState(INITIAL_GAME_STATE)
   }
@@ -176,6 +173,8 @@ export default function App() {
             onRemove={(at) => updateSlotsReturningItems((prev) => removeUnit(prev, at))}
             onCycleStar={(at) => updateSlots((prev) => cycleStarLevel(prev, at))}
             onEquip={handleEquip}
+            canResetBoard={!isLoadoutEmpty(loadout)}
+            onResetBoard={() => setLoadout(resetLoadout())}
             onUnequip={handleUnequip}
           />
           <RecommendationList request={request} refreshKey={refreshKey} />

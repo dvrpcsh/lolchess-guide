@@ -230,8 +230,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outl
   width: max-content; max-width: 100%;
 }
 @media (max-width: 600px) { .board-panel { --hex-w: 44px; } }
-.board-header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-.board-count { font-size: 0.8rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.board-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.board-header .panel-title { margin: 0; }
+.board-count { margin-left: auto; font-size: 0.8rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.reset-board-button { padding: 5px 12px; font-size: 0.8rem; }
+.reset-board-button:hover:not(:disabled) { border-color: var(--tier-s); color: var(--tier-s); }
+.reset-board-button:disabled { opacity: 0.4; cursor: default; }
 
 .hex-board { padding: 4px 0 calc(var(--hex-h) * 0.25); }
 .hex-row { display: flex; gap: var(--hex-gap); }

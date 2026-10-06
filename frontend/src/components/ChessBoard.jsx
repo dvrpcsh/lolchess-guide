@@ -23,12 +23,14 @@ const STAR_NAMES = { 1: '1성(동)', 2: '2성(은)', 3: '3성(금)' }
  *   - 성급(★) 클릭 --> onCycleStar(at)  1성 -> 2성 -> 3성 -> 1성
  *   - 인벤토리(ItemSelector) 아이템 드래그 --> 기물 위 drop --> onEquip(at, itemName)  (빈 슬롯이 있을 때만)
  *   - 장착 아이템 클릭 --> onUnequip(at, itemIndex)  (App이 인벤토리로 반환)
+ *   - "판세 초기화" 버튼 --> onResetBoard()  (모든 기물·성급·장착 아이템·인벤토리 일괄 초기화)
  *   --> App이 slots / itemCounts 갱신 --> 이름·성급·장착 아이템이 추천 API로 자동 전송
  *
  * 칸 위치 표기: { area: 'board' | 'bench', index }
  */
 export default function ChessBoard({
   slots, championsById, itemIconByName, onPlace, onMove, onRemove, onCycleStar, onEquip, onUnequip,
+  canResetBoard, onResetBoard,
 }) {
   // 드래그 중인 기물/아이템이 올라가 있는 칸 (하이라이트용) - 'board-3', 'bench-0' 형태
   const [hoverKey, setHoverKey] = useState(null)
@@ -160,6 +162,15 @@ export default function ChessBoard({
         <span className="board-count">
           전장 {countPlaced(slots, 'board')} · 벤치 {countPlaced(slots, 'bench')}
         </span>
+        <button
+          type="button"
+          className="ghost-button reset-board-button"
+          onClick={onResetBoard}
+          disabled={!canResetBoard}
+          title="체스판·벤치의 모든 기물, 성급, 장착 아이템과 인벤토리를 비웁니다"
+        >
+          판세 초기화 (Reset Board)
+        </button>
       </div>
 
       <div className="hex-board" role="grid" aria-label="4x7 체스판">
@@ -176,7 +187,7 @@ export default function ChessBoard({
       </div>
 
       <p className="board-hint">
-        <b>기물 도감</b>에서 챔피언을 끌어다 놓고, <b>아이템</b> 탭의 보유 아이템을 기물 위로 끌어 장착하세요.
+        <b>기물 도감</b>에서 챔피언을 끌어다 놓고, <b>아이템</b> 탭의 아이템을 기물 위로 끌어 바로 장착하세요.
         ★을 누르면 성급이 바뀌고, 장착 아이템을 누르면 해제됩니다. 기물을 판 밖으로 끌거나 우클릭하면 제거됩니다.
       </p>
     </section>
