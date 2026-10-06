@@ -44,7 +44,8 @@ class RecommendationServiceTest {
                 champion("트위치", 2), champion("아리", 4)));
         ItemRecipeService itemRecipeService = Mockito.mock(ItemRecipeService.class);
         when(itemRecipeService.getComponentsByCompletedName()).thenReturn(Map.of(
-                "구인수의 격노검", List.of("곡궁", "쓸데없이 큰 지팡이")));
+                "구인수의 격노검", List.of("곡궁", "쓸데없이 큰 지팡이"),
+                "붉은 덩굴정령", List.of("곡궁", "곡궁")));
         service = new RecommendationService(repository, championRepository, new TftSystemRuleEngine(), itemRecipeService);
     }
 
@@ -139,6 +140,29 @@ class RecommendationServiceTest {
         // 보유 20 + 아이템(분해된 곡궁) 15 + 장착(분해된 곡궁) 10 + A 5 = 50
         assertThat(aComp.matchScore()).isEqualTo(50);
         assertThat(aComp.matchedItems()).containsExactly("곡궁");
+    }
+
+    @Test
+    void 장착_점수는_덱_추천_아이템_요구_개수를_넘지_않는다() {
+        // A덱 추천 아이템: 곡궁 1개. 아펠리오스에 붉은 덩굴정령(곡궁 + 곡궁) 장착
+        RecommendRequest request = new RecommendRequest(List.of(), List.of(), Map.of(), null, null, null,
+                List.of(new PlacedUnitRequest("아펠리오스", 1, List.of("붉은 덩굴정령"))));
+
+        int score = scoreOf(service.recommend(request), "A덱");
+
+        // 보유 20 + 아이템 곡궁(상한 1개) 15 + 장착 곡궁(상한 1개) 10 + A 5 = 50 (상한이 없으면 장착 20으로 60)
+        assertThat(score).isEqualTo(50);
+    }
+
+    @Test
+    void 장착_상한은_여러_핵심_기물에_나눠_장착해도_덱_전체_기준으로_적용된다() {
+        // A덱 핵심 기물 아펠리오스와 트위치에 곡궁을 하나씩 장착 (추천 곡궁 1개)
+        RecommendRequest request = new RecommendRequest(List.of(), List.of(), Map.of(), null, null, null, List.of(
+                new PlacedUnitRequest("아펠리오스", 1, List.of("곡궁")),
+                new PlacedUnitRequest("트위치", 1, List.of("곡궁"))));
+
+        // 보유 2기 40 + 아이템 곡궁 15 + 장착 곡궁 1개분 10 + A 5 = 70
+        assertThat(scoreOf(service.recommend(request), "A덱")).isEqualTo(70);
     }
 
     private static int scoreOf(List<RecommendResponse> results, String compName) {

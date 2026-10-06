@@ -50,6 +50,8 @@ import java.util.stream.Collectors;
  *   - 완성 아이템: 덱 추천 목록에 그 완성 아이템이 있으면 그대로 비교하고,
  *                 없으면 재료 2개로 분해해 재료 기준으로 비교한다. (예: 무한의 대검 = B.F. 대검 + 연습용 장갑)
  *                 장착 점수도 같은 방식으로, 분해된 재료가 추천 아이템이면 재료당 +10
+ *   - 장착 상한  : 장착 점수는 아이템별로 덱 추천 목록의 요구 개수를 넘지 않는다. (덱 전체 핵심 기물 합산 기준)
+ *                 예) 추천 목록에 곡궁이 1개면, 곡궁 2개로 만든 붉은 덩굴정령을 장착해도 곡궁 1개분(+10)만 인정
  *   - 티어 점수  : S +10, A +5, B +0
  *   티어 점수는 "현재 상황과의 일치도"가 아니므로, 기물/아이템이 하나도 맞지 않는 덱은
  *   티어와 관계없이 결과에서 제외한다. (빈 요청에 S티어 덱이 무조건 추천되는 것을 방지)
@@ -140,7 +142,7 @@ public class RecommendationService {
         // 핵심 기물의 성급 가중치와, 핵심 기물에 덱 추천 아이템을 장착한 경우의 가중치
         Set<String> recommendedItemSet = requiredItems.keySet();
         int starScore = 0;
-        int equippedMatches = 0;
+        Map<String, Integer> equippedCounts = new LinkedHashMap<>(); // 추천 아이템 -> 핵심 기물에 장착된 개수
         for (String unit : coreUnits) {
             starScore += switch (board.starLevels().getOrDefault(unit, 1)) {
                 case 3 -> THREE_STAR_SCORE;
@@ -148,9 +150,14 @@ public class RecommendationService {
                 default -> 0;
             };
             for (String equipped : board.equippedItems().getOrDefault(unit, List.of())) {
-                equippedMatches += board.asRecommendedItems(equipped, recommendedItemSet).size();
+                board.asRecommendedItems(equipped, recommendedItemSet)
+                        .forEach(item -> equippedCounts.merge(item, 1, Integer::sum));
             }
         }
+        // 장착 개수를 아이템별 덱 요구 개수로 상한 처리
+        int equippedMatches = equippedCounts.entrySet().stream()
+                .mapToInt(e -> (int) Math.min(e.getValue(), requiredItems.get(e.getKey())))
+                .sum();
 
         int matchScore = (int) boardMatches * BOARD_UNIT_SCORE
                 + unitsToBuy.size() * SHOP_UNIT_SCORE
