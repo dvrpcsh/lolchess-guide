@@ -47,6 +47,9 @@ import java.util.stream.Collectors;
  *   - 성급 점수  : 덱 핵심 기물이 2성이면 +10, 3성이면 +25 (같은 기물이 여러 개면 가장 높은 성급 기준)
  *   - 장착 점수  : 덱 핵심 기물에 장착된 아이템이 덱 추천 아이템이면 개당 +10
  *                 (장착 아이템은 위 "아이템 점수"의 보유 수량에도 포함되므로, 인벤토리에서 장착으로 옮겨도 점수가 줄지 않는다)
+ *   - 완성 아이템: 덱 추천 목록에 그 완성 아이템이 있으면 그대로 비교하고,
+ *                 없으면 재료 2개로 분해해 재료 기준으로 비교한다. (예: 무한의 대검 = B.F. 대검 + 연습용 장갑)
+ *                 장착 점수도 같은 방식으로, 분해된 재료가 추천 아이템이면 재료당 +10
  *   - 티어 점수  : S +10, A +5, B +0
  *   티어 점수는 "현재 상황과의 일치도"가 아니므로, 기물/아이템이 하나도 맞지 않는 덱은
  *   티어와 관계없이 결과에서 제외한다. (빈 요청에 S티어 덱이 무조건 추천되는 것을 방지)
@@ -74,12 +77,14 @@ public class RecommendationService {
     private final MetaCompRepository metaCompRepository;
     private final ChampionRepository championRepository;
     private final TftSystemRuleEngine ruleEngine;
+    private final ItemRecipeService itemRecipeService;
 
     /**
      * 현재 게임 상황에 맞는 메타 덱을 총점 내림차순으로 반환한다.
      */
     public List<RecommendResponse> recommend(RecommendRequest request) {
-        BoardContext board = BoardContext.from(request, normalize(request.boardUnits()));
+        BoardContext board = BoardContext.from(request, normalize(request.boardUnits()),
+                itemRecipeService.getComponentsByCompletedName());
         Set<String> boardUnits = board.units();
         // 요청 값의 앞뒤 공백을 제거하고 중복을 없애, 같은 기물이 상점에 2번 떠도 1번만 점수에 반영
         Set<String> shopUnits = normalize(request.shopUnits());
@@ -112,7 +117,6 @@ public class RecommendationService {
     // 덱 하나에 대해 기물/아이템/성급/장착/티어 점수를 계산
     private ScoredComp score(MetaCompEntity comp, BoardContext board, Set<String> shopUnits) {
         List<String> coreUnits = comp.getCoreUnits();
-        Map<String, Integer> itemCounts = board.ownedItemCounts();
 
         long boardMatches = coreUnits.stream().filter(board.units()::contains).count();
         // 매수 추천 기물: 덱 핵심 기물 중 상점에 뜬 것 (덱에 정의된 순서 유지)
@@ -121,6 +125,7 @@ public class RecommendationService {
         // 덱 추천 아이템별 필요 개수 (같은 아이템이 여러 번 등록되어 있으면 그만큼 필요)
         Map<String, Long> requiredItems = comp.getRecommendedItems().stream()
                 .collect(Collectors.groupingBy(Function.identity(), LinkedHashMap::new, Collectors.counting()));
+        Map<String, Integer> itemCounts = board.ownedItemCountsFor(requiredItems.keySet());
         int itemMatches = 0;
         List<String> matchedItems = new ArrayList<>();
         for (Map.Entry<String, Long> required : requiredItems.entrySet()) {
@@ -142,8 +147,9 @@ public class RecommendationService {
                 case 2 -> TWO_STAR_SCORE;
                 default -> 0;
             };
-            equippedMatches += (int) board.equippedItems().getOrDefault(unit, List.of()).stream()
-                    .filter(recommendedItemSet::contains).count();
+            for (String equipped : board.equippedItems().getOrDefault(unit, List.of())) {
+                equippedMatches += board.asRecommendedItems(equipped, recommendedItemSet).size();
+            }
         }
 
         int matchScore = (int) boardMatches * BOARD_UNIT_SCORE
@@ -234,12 +240,41 @@ public class RecommendationService {
      * @param units           보유 기물 이름 (boardUnits + placedUnits 이름)
      * @param starLevels      기물 이름 -> 최고 성급
      * @param equippedItems   기물 이름 -> 장착 아이템 목록 (같은 기물이 여러 개면 합침)
-     * @param ownedItemCounts 아이템 이름 -> 보유 수량 (인벤토리 itemCounts + 장착 아이템)
+     * @param ownedItemCounts 아이템 이름 -> 보유 수량 (인벤토리 itemCounts + 장착 아이템, 완성 아이템은 분해 전 이름)
+     * @param componentsByCompleted 완성 아이템 이름 -> 재료 2개 (조합표)
      */
     private record BoardContext(Set<String> units, Map<String, Integer> starLevels,
-                                Map<String, List<String>> equippedItems, Map<String, Integer> ownedItemCounts) {
+                                Map<String, List<String>> equippedItems, Map<String, Integer> ownedItemCounts,
+                                Map<String, List<String>> componentsByCompleted) {
 
-        static BoardContext from(RecommendRequest request, Set<String> boardUnits) {
+        /**
+         * 덱 하나 기준의 보유 수량. 덱 추천 목록에 없는 완성 아이템은 재료 2개로 분해해 재료 수량에 더한다.
+         */
+        Map<String, Integer> ownedItemCountsFor(Set<String> recommendedItems) {
+            Map<String, Integer> counts = new LinkedHashMap<>();
+            ownedItemCounts.forEach((item, count) -> {
+                for (String asItem : asRecommendedItems(item, recommendedItems)) {
+                    counts.merge(asItem, count, Integer::sum);
+                }
+            });
+            return counts;
+        }
+
+        /**
+         * 아이템 하나를 덱 추천 목록 기준으로 해석한다.
+         * 추천 목록에 그대로 있으면 [아이템], 완성 아이템이면 추천 목록에 있는 재료들, 그 외에는 빈 목록.
+         */
+        List<String> asRecommendedItems(String item, Set<String> recommendedItems) {
+            if (recommendedItems.contains(item)) {
+                return List.of(item);
+            }
+            return componentsByCompleted.getOrDefault(item, List.of()).stream()
+                    .filter(recommendedItems::contains)
+                    .toList();
+        }
+
+        static BoardContext from(RecommendRequest request, Set<String> boardUnits,
+                                 Map<String, List<String>> componentsByCompleted) {
             Set<String> units = new LinkedHashSet<>(boardUnits);
             Map<String, Integer> starLevels = new LinkedHashMap<>();
             Map<String, List<String>> equippedItems = new LinkedHashMap<>();
@@ -257,7 +292,7 @@ public class RecommendationService {
                 equippedItems.computeIfAbsent(name, n -> new ArrayList<>()).addAll(placed.items());
                 placed.items().forEach(item -> ownedItemCounts.merge(item, 1, Integer::sum));
             }
-            return new BoardContext(units, starLevels, equippedItems, ownedItemCounts);
+            return new BoardContext(units, starLevels, equippedItems, ownedItemCounts, componentsByCompleted);
         }
     }
 

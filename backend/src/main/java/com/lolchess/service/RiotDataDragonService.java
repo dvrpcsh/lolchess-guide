@@ -81,6 +81,7 @@ public class RiotDataDragonService {
     private final TransactionTemplate transactionTemplate;
     private final ChampionRepository championRepository;
     private final ItemRepository itemRepository;
+    private final ItemRecipeService itemRecipeService;
 
     /**
      * Data Dragon 최신 데이터를 정제한 결과가 DB 내용과 다르면 다시 저장한다.
@@ -117,14 +118,15 @@ public class RiotDataDragonService {
     }
 
     /**
-     * GET /api/v1/items - 재료 아이템과 조합 아이템을 나눈 목록
+     * GET /api/v1/items - 재료 아이템과 조합 아이템을 나눈 목록 + 재료 2개 -> 완성 아이템 조합법
      */
     @Transactional(readOnly = true)
     public ItemListResponse getItems() {
         List<ItemEntity> items = itemRepository.findAllByOrderByNameAsc();
         return new ItemListResponse(
                 items.stream().filter(ItemEntity::isComponent).map(ItemResponse::from).toList(),
-                items.stream().filter(item -> !item.isComponent()).map(ItemResponse::from).toList()
+                items.stream().filter(item -> !item.isComponent()).map(ItemResponse::from).toList(),
+                itemRecipeService.getRecipes()
         );
     }
 

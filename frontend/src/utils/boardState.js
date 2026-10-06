@@ -10,6 +10,7 @@
  *
  * 상태 구조: { board: (Unit|null)[28], bench: (Unit|null)[9] }
  *   Unit = { championId, starLevel: 1~3, items: [itemName|null, itemName|null, itemName|null] }
+ *     items의 각 칸은 재료 아이템 또는 완성 아이템 이름. 재료 2개가 모이면 recipeBook으로 완성 아이템 1칸으로 합성된다.
  *   Loadout = { slots, itemCounts }  체스판 배치 + 장착하지 않은 인벤토리 아이템 수량 (App이 하나의 상태로 관리)
  *   board 인덱스 = row * 7 + col  (row 0 = 맨 윗줄)
  *   기물을 옮기거나 자리를 바꿀 때 Unit 객체째 이동하므로 성급과 장착 아이템이 함께 따라간다.
@@ -29,7 +30,8 @@ export const EMPTY_SLOTS = {
 // 드래그 데이터 MIME 타입. dragover 단계에서는 데이터 내용을 읽을 수 없어 출처를 타입으로 구분한다.
 export const DRAG_TYPE_CODEX = 'application/x-tft-codex' // 도감에서 새 기물 꺼내기 (copy)
 export const DRAG_TYPE_PLACED = 'application/x-tft-placed' // 이미 놓인 기물 옮기기 (move)
-export const DRAG_TYPE_ITEM = 'application/x-tft-item' // 인벤토리 아이템을 기물에 장착 (copy)
+export const DRAG_TYPE_ITEM = 'application/x-tft-item' // 인벤토리 재료 아이템을 기물에 장착 (copy)
+export const DRAG_TYPE_COMPLETED_ITEM = 'application/x-tft-completed-item' // 완성 아이템을 기물에 바로 장착 (copy)
 
 export function createUnit(championId) {
   return { championId, starLevel: 1, items: Array(ITEM_SLOTS).fill(null) }
@@ -82,32 +84,64 @@ export function hasEmptyItemSlot(unit) {
 }
 
 /**
- * 기물의 첫 빈 슬롯에 아이템을 장착한다.
- * @returns {{ slots, equipped: boolean }} 슬롯이 가득 찼거나 기물이 없으면 equipped = false
+ * 드래그 중인 아이템을 이 기물 위에 놓을 수 있는지 (dragover 단계 판단용, 아이템 이름은 아직 알 수 없음)
+ * - 완성 아이템: 빈 슬롯이 있어야 함
+ * - 재료 아이템: 빈 슬롯이 있거나, 합성 대기 중인 재료가 있으면(슬롯이 꽉 차 있어도 합성으로 장착 가능) 허용
  */
-export function equipItem(slots, at, itemName) {
+export function canAcceptItem(unit, isCompletedDrag, recipeBook) {
+  if (!unit) return false
+  if (hasEmptyItemSlot(unit)) return true
+  return !isCompletedDrag && unit.items.some((item) => item && !recipeBook.isCompleted(item))
+}
+
+/**
+ * 기물에 아이템을 장착한다.
+ * - 재료 아이템: 슬롯에 조합 가능한 재료가 있으면 그 칸을 완성 아이템으로 합성 (재료 2칸 -> 완성 1칸),
+ *               없으면 첫 빈 슬롯에 재료로 장착
+ * - 완성 아이템: 첫 빈 슬롯에 그대로 장착
+ * 기물당 최대 3칸이므로 완성 아이템은 최대 3개까지 장착된다.
+ * @returns {{ slots, equipped: boolean, synthesized: string|null }} 장착 불가면 equipped = false
+ */
+export function equipItem(slots, at, itemName, recipeBook) {
   const unit = getUnit(slots, at)
-  if (!hasEmptyItemSlot(unit)) {
-    return { slots, equipped: false }
+  if (!unit) {
+    return { slots, equipped: false, synthesized: null }
   }
   const items = [...unit.items]
-  items[items.indexOf(null)] = itemName
-  return { slots: withSlot(slots, at, { ...unit, items }), equipped: true }
+
+  if (!recipeBook.isCompleted(itemName)) {
+    const partnerIndex = items.findIndex(
+      (item) => item && !recipeBook.isCompleted(item) && recipeBook.combine(item, itemName),
+    )
+    if (partnerIndex !== -1) {
+      const synthesized = recipeBook.combine(items[partnerIndex], itemName)
+      items[partnerIndex] = synthesized
+      return { slots: withSlot(slots, at, { ...unit, items }), equipped: true, synthesized }
+    }
+  }
+
+  const emptyIndex = items.indexOf(null)
+  if (emptyIndex === -1) {
+    return { slots, equipped: false, synthesized: null }
+  }
+  items[emptyIndex] = itemName
+  return { slots: withSlot(slots, at, { ...unit, items }), equipped: true, synthesized: null }
 }
 
 /**
  * 기물의 itemIndex 슬롯 아이템을 해제한다. 뒤의 아이템을 앞으로 당겨 빈 칸이 항상 뒤에 오게 한다.
- * @returns {{ slots, returnedItem: string|null }}
+ * 완성 아이템은 조합에 들어간 재료 2개로 분해되어 returnedItems로 돌아간다.
+ * @returns {{ slots, returnedItems: string[] }}
  */
-export function unequipItem(slots, at, itemIndex) {
+export function unequipItem(slots, at, itemIndex, recipeBook) {
   const unit = getUnit(slots, at)
-  const returnedItem = unit?.items[itemIndex] ?? null
-  if (!returnedItem) {
-    return { slots, returnedItem: null }
+  const removed = unit?.items[itemIndex] ?? null
+  if (!removed) {
+    return { slots, returnedItems: [] }
   }
   const remaining = unit.items.filter((item, i) => item && i !== itemIndex)
   const items = [...remaining, ...Array(ITEM_SLOTS - remaining.length).fill(null)]
-  return { slots: withSlot(slots, at, { ...unit, items }), returnedItem }
+  return { slots: withSlot(slots, at, { ...unit, items }), returnedItems: recipeBook.toComponents([removed]) }
 }
 
 /** 체스판 + 벤치에 놓인 챔피언의 이름 목록 (중복 제거, 추천 API의 boardUnits 용) */
@@ -142,16 +176,16 @@ export function isLoadoutEmpty({ slots, itemCounts }) {
 }
 
 /**
- * 인벤토리 아이템을 at 칸 기물에 장착한다.
- * - 인벤토리에 1개 이상 있으면: 1개를 꺼내 장착 (인벤토리 -1, 장착 +1)
- * - 인벤토리에 0개면: 그 자리에서 1개를 획득해 바로 장착한 것으로 처리 (획득 +1 -> 장착으로 이동, 인벤토리는 0 유지)
+ * 아이템을 at 칸 기물에 장착한다. (재료는 조합 가능한 재료가 있으면 자동 합성)
+ * - 재료 아이템이 인벤토리에 1개 이상 있으면: 1개를 꺼내 장착 (인벤토리 -1, 장착 +1)
+ * - 재료 아이템이 인벤토리에 0개이거나 완성 아이템이면: 그 자리에서 획득해 바로 장착한 것으로 처리 (인벤토리 변화 없음)
  * 어느 경우든 보유 아이템 총량(인벤토리 + 장착)은 "실제로 가진 개수"와 같게 유지되어 추천 점수가 이중 계산되지 않는다.
- * 빈 칸이거나 슬롯 3개가 꽉 찬 기물이면 그대로 반환한다.
+ * 빈 칸이거나 장착할 슬롯이 없는 기물이면 그대로 반환한다.
  */
-export function equipFromInventory(loadout, at, itemName) {
-  const { slots: nextSlots, equipped } = equipItem(loadout.slots, at, itemName)
+export function equipFromInventory(loadout, at, itemName, recipeBook) {
+  const { slots: nextSlots, equipped } = equipItem(loadout.slots, at, itemName, recipeBook)
   if (!equipped) return loadout
-  const hasInInventory = (loadout.itemCounts[itemName] ?? 0) > 0
+  const hasInInventory = !recipeBook.isCompleted(itemName) && (loadout.itemCounts[itemName] ?? 0) > 0
   return {
     slots: nextSlots,
     itemCounts: hasInInventory ? takeItemFromInventory(loadout.itemCounts, itemName) : loadout.itemCounts,
@@ -170,11 +204,15 @@ export function adjustItemCount(itemCounts, itemName, delta) {
   return next
 }
 
-/** 인벤토리 수량 객체에 아이템들을 1개씩 더한다. */
-export function addItemsToInventory(itemCounts, itemNames) {
-  if (itemNames.length === 0) return itemCounts
+/**
+ * 인벤토리 수량 객체에 아이템들을 1개씩 더한다.
+ * 인벤토리는 재료 아이템만 관리하므로, 완성 아이템은 recipeBook으로 재료 2개로 분해해 더한다.
+ */
+export function addItemsToInventory(itemCounts, itemNames, recipeBook) {
+  const components = recipeBook.toComponents(itemNames)
+  if (components.length === 0) return itemCounts
   const next = { ...itemCounts }
-  itemNames.forEach((name) => {
+  components.forEach((name) => {
     next[name] = (next[name] ?? 0) + 1
   })
   return next

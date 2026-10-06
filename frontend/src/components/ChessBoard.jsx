@@ -4,10 +4,11 @@ import {
   BOARD_COLS,
   BOARD_ROWS,
   DRAG_TYPE_CODEX,
+  DRAG_TYPE_COMPLETED_ITEM,
   DRAG_TYPE_ITEM,
   DRAG_TYPE_PLACED,
   countPlaced,
-  hasEmptyItemSlot,
+  canAcceptItem,
 } from '../utils/boardState'
 
 const STAR_NAMES = { 1: '1성(동)', 2: '2성(은)', 3: '3성(금)' }
@@ -21,15 +22,16 @@ const STAR_NAMES = { 1: '1성(동)', 2: '2성(은)', 3: '3성(금)' }
  *   - 놓인 기물을 다른 칸으로 드래그 --> drop --> onMove(from, to)  (기물이 있으면 성급·아이템째 자리 교환)
  *   - 놓인 기물을 판 밖으로 드래그 아웃 / 우클릭 --> onRemove(at)  (장착 아이템은 App이 인벤토리로 반환)
  *   - 성급(★) 클릭 --> onCycleStar(at)  1성 -> 2성 -> 3성 -> 1성
- *   - 인벤토리(ItemSelector) 아이템 드래그 --> 기물 위 drop --> onEquip(at, itemName)  (빈 슬롯이 있을 때만)
- *   - 장착 아이템 클릭 --> onUnequip(at, itemIndex)  (App이 인벤토리로 반환)
+ *   - 재료 아이템(ItemSelector) / 완성 아이템(CompletedItemCodex) 드래그 --> 기물 위 drop --> onEquip(at, itemName)
+ *       재료는 슬롯에 조합 가능한 재료가 있으면 완성 아이템으로 자동 합성된다 (boardState.equipItem)
+ *   - 장착 아이템 클릭 --> onUnequip(at, itemIndex)  (완성 아이템은 재료 2개로 분해되어 인벤토리로 반환)
  *   - "판세 초기화" 버튼 --> onResetBoard()  (모든 기물·성급·장착 아이템·인벤토리 일괄 초기화)
  *   --> App이 slots / itemCounts 갱신 --> 이름·성급·장착 아이템이 추천 API로 자동 전송
  *
  * 칸 위치 표기: { area: 'board' | 'bench', index }
  */
 export default function ChessBoard({
-  slots, championsById, itemIconByName, onPlace, onMove, onRemove, onCycleStar, onEquip, onUnequip,
+  slots, championsById, itemIconByName, recipeBook, onPlace, onMove, onRemove, onCycleStar, onEquip, onUnequip,
   canResetBoard, onResetBoard,
 }) {
   // 드래그 중인 기물/아이템이 올라가 있는 칸 (하이라이트용) - 'board-3', 'bench-0' 형태
@@ -40,8 +42,9 @@ export default function ChessBoard({
 
   const handleDragOver = (event, key, unit) => {
     const types = event.dataTransfer.types
-    if (types.includes(DRAG_TYPE_ITEM)) {
-      if (!hasEmptyItemSlot(unit)) return // 빈 칸이거나 아이템 3개가 꽉 찬 기물에는 장착 불가
+    const isCompletedDrag = types.includes(DRAG_TYPE_COMPLETED_ITEM)
+    if (isCompletedDrag || types.includes(DRAG_TYPE_ITEM)) {
+      if (!canAcceptItem(unit, isCompletedDrag, recipeBook)) return // 빈 칸이거나 장착할 슬롯이 없는 기물
       event.preventDefault()
       event.dataTransfer.dropEffect = 'copy'
       setHoverKey(key)
@@ -58,7 +61,7 @@ export default function ChessBoard({
   const handleDrop = (event, target) => {
     event.preventDefault()
     setHoverKey(null)
-    const itemData = event.dataTransfer.getData(DRAG_TYPE_ITEM)
+    const itemData = event.dataTransfer.getData(DRAG_TYPE_ITEM) || event.dataTransfer.getData(DRAG_TYPE_COMPLETED_ITEM)
     if (itemData) {
       onEquip(target, JSON.parse(itemData).itemName)
       return
@@ -132,9 +135,11 @@ export default function ChessBoard({
                   <button
                     key={itemIndex}
                     type="button"
-                    className="unit-item"
+                    className={`unit-item ${recipeBook.isCompleted(itemName) ? 'is-completed' : 'is-component'}`}
                     onClick={() => onUnequip(at, itemIndex)}
-                    title={`${itemName} - 클릭하면 해제`}
+                    title={recipeBook.isCompleted(itemName)
+                      ? `${itemName} (${recipeBook.componentsOf(itemName).join(' + ')}) - 클릭하면 재료로 분해되어 해제`
+                      : `${itemName} (재료, 조합 대기) - 클릭하면 해제`}
                     aria-label={`${champion.name}의 ${itemName} 해제`}
                   >
                     {itemIconByName.get(itemName)
@@ -187,7 +192,7 @@ export default function ChessBoard({
       </div>
 
       <p className="board-hint">
-        <b>기물 도감</b>에서 챔피언을 끌어다 놓고, <b>아이템</b> 탭의 아이템을 기물 위로 끌어 바로 장착하세요.
+        <b>기물 도감</b>에서 챔피언을 끌어다 놓고, <b>아이템</b> 탭의 재료·완성 아이템을 기물 위로 끌어 장착하세요(재료 2개는 자동 합성).
         ★을 누르면 성급이 바뀌고, 장착 아이템을 누르면 해제됩니다. 기물을 판 밖으로 끌거나 우클릭하면 제거됩니다.
       </p>
     </section>

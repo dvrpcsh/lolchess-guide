@@ -42,7 +42,10 @@ class RecommendationServiceTest {
         when(championRepository.findAll()).thenReturn(List.of(
                 champion("드레이븐", 5), champion("브랜드", 3), champion("아펠리오스", 4),
                 champion("트위치", 2), champion("아리", 4)));
-        service = new RecommendationService(repository, championRepository, new TftSystemRuleEngine());
+        ItemRecipeService itemRecipeService = Mockito.mock(ItemRecipeService.class);
+        when(itemRecipeService.getComponentsByCompletedName()).thenReturn(Map.of(
+                "구인수의 격노검", List.of("곡궁", "쓸데없이 큰 지팡이")));
+        service = new RecommendationService(repository, championRepository, new TftSystemRuleEngine(), itemRecipeService);
     }
 
     @Test
@@ -122,6 +125,20 @@ class RecommendationServiceTest {
 
         // 아리는 A덱 핵심 기물이 아니므로 장착 가중치는 없고, 보유 아이템 점수(곡궁 15)만 동일하게 유지
         assertThat(after).isEqualTo(before).isEqualTo(15 + 5);
+    }
+
+    @Test
+    void 완성_아이템은_재료로_분해해_추천_아이템과_비교한다() {
+        // A덱 핵심 기물 아펠리오스에 구인수의 격노검(곡궁 + 쓸데없이 큰 지팡이) 장착, A덱 추천 아이템은 곡궁
+        RecommendRequest request = new RecommendRequest(List.of(), List.of(), Map.of(), null, null, null,
+                List.of(new PlacedUnitRequest("아펠리오스", 1, List.of("구인수의 격노검"))));
+
+        RecommendResponse aComp = service.recommend(request).stream()
+                .filter(r -> r.compName().equals("A덱")).findFirst().orElseThrow();
+
+        // 보유 20 + 아이템(분해된 곡궁) 15 + 장착(분해된 곡궁) 10 + A 5 = 50
+        assertThat(aComp.matchScore()).isEqualTo(50);
+        assertThat(aComp.matchedItems()).containsExactly("곡궁");
     }
 
     private static int scoreOf(List<RecommendResponse> results, String compName) {
