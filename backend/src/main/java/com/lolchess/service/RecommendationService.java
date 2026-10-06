@@ -341,7 +341,9 @@ public class RecommendationService {
                     interestWarnings,
                     probabilityTips,
                     roundTip,
-                    actionBriefings
+                    actionBriefings,
+                    Collections.unmodifiableMap(new LinkedHashMap<>(comp.getBuildUpGuide())),
+                    Collections.unmodifiableMap(new LinkedHashMap<>(comp.getUnitItemMap()))
             );
         }
     }

@@ -1,7 +1,10 @@
 package com.lolchess.entity;
 
 import jakarta.persistence.CollectionTable;
+import com.lolchess.entity.converter.BuildUpGuideConverter;
+import com.lolchess.entity.converter.UnitItemMapConverter;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -18,7 +21,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -30,6 +35,8 @@ import java.util.Objects;
  *   meta_comp                     : 덱 본문 (id, name, tier, description)
  *   meta_comp_core_units          : 덱별 핵심 유닛 목록 (meta_comp_id FK, 순서 보존)
  *   meta_comp_recommended_items   : 덱별 추천 재료/완제 아이템 목록 (meta_comp_id FK, 순서 보존)
+ *   meta_comp.build_up_guide      : 레벨별 빌드업 기물 (JSON TEXT, 예: {"4": ["자야", ...]})
+ *   meta_comp.unit_item_map       : 핵심 기물별 추천 완성 아이템 (JSON TEXT, 예: {"아펠리오스": ["무한의 대검", ...]})
  *
  * [Data Flow]
  *   (쓰기) DataInitializer / 향후 관리 API --> MetaCompRepository.save()
@@ -74,37 +81,61 @@ public class MetaCompEntity {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    // 레벨(4~9) -> 그 레벨에서 필드에 올릴 추천 기물 목록. 상세 가이드 화면에 통째로 보여 주는 데이터라 JSON 한 컬럼에 저장
+    @Convert(converter = BuildUpGuideConverter.class)
+    @Column(columnDefinition = "TEXT")
+    private Map<Integer, List<String>> buildUpGuide = new LinkedHashMap<>();
+
+    // 핵심 기물 이름 -> 추천 완성 아이템 목록 (보통 3개)
+    @Convert(converter = UnitItemMapConverter.class)
+    @Column(columnDefinition = "TEXT")
+    private Map<String, List<String>> unitItemMap = new LinkedHashMap<>();
+
     @Builder
-    private MetaCompEntity(String name, Tier tier, List<String> coreUnits,
-                           List<String> recommendedItems, String description) {
+    private MetaCompEntity(String name, Tier tier, List<String> coreUnits, List<String> recommendedItems,
+                           String description, Map<Integer, List<String>> buildUpGuide,
+                           Map<String, List<String>> unitItemMap) {
         this.name = name;
         this.tier = tier;
         // 외부 리스트 참조를 그대로 보관하지 않도록 방어적 복사 (불변 List.of() 전달 시에도 Hibernate가 수정 가능)
         this.coreUnits = coreUnits != null ? new ArrayList<>(coreUnits) : new ArrayList<>();
         this.recommendedItems = recommendedItems != null ? new ArrayList<>(recommendedItems) : new ArrayList<>();
         this.description = description;
+        this.buildUpGuide = copyOf(buildUpGuide);
+        this.unitItemMap = copyOf(unitItemMap);
     }
 
     /**
-     * 덱 구성(티어, 핵심 기물, 추천 아이템, 설명)을 새 값으로 교체한다.
-     * 컬렉션은 Hibernate가 추적 중인 인스턴스를 유지한 채 내용만 바꿔야 변경 감지가 정상 동작한다.
+     * 덱 구성(티어, 핵심 기물, 추천 아이템, 설명, 레벨별 빌드업, 기물별 추천 아이템)을 새 값으로 교체한다.
+     * @ElementCollection 컬렉션은 Hibernate가 추적 중인 인스턴스를 유지한 채 내용만 바꿔야 변경 감지가 정상 동작하고,
+     * JSON 컨버터 필드(Map)는 새 인스턴스로 교체해야 변경이 감지된다.
      */
-    public void updateComposition(Tier tier, List<String> coreUnits, List<String> recommendedItems, String description) {
+    public void updateComposition(Tier tier, List<String> coreUnits, List<String> recommendedItems, String description,
+                                  Map<Integer, List<String>> buildUpGuide, Map<String, List<String>> unitItemMap) {
         this.tier = tier;
         this.coreUnits.clear();
         this.coreUnits.addAll(coreUnits);
         this.recommendedItems.clear();
         this.recommendedItems.addAll(recommendedItems);
         this.description = description;
+        this.buildUpGuide = copyOf(buildUpGuide);
+        this.unitItemMap = copyOf(unitItemMap);
     }
 
     /**
      * 저장된 구성이 주어진 값과 완전히 같은지 비교한다. (같으면 불필요한 UPDATE를 생략하기 위함)
      */
-    public boolean hasSameComposition(Tier tier, List<String> coreUnits, List<String> recommendedItems, String description) {
+    public boolean hasSameComposition(Tier tier, List<String> coreUnits, List<String> recommendedItems, String description,
+                                      Map<Integer, List<String>> buildUpGuide, Map<String, List<String>> unitItemMap) {
         return this.tier == tier
                 && this.coreUnits.equals(coreUnits)
                 && this.recommendedItems.equals(recommendedItems)
-                && Objects.equals(this.description, description);
+                && Objects.equals(this.description, description)
+                && this.buildUpGuide.equals(copyOf(buildUpGuide))
+                && this.unitItemMap.equals(copyOf(unitItemMap));
+    }
+
+    private static <K> Map<K, List<String>> copyOf(Map<K, List<String>> source) {
+        return source != null ? new LinkedHashMap<>(source) : new LinkedHashMap<>();
     }
 }

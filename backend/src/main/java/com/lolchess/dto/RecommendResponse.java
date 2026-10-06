@@ -1,6 +1,7 @@
 package com.lolchess.dto;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * [역할] 덱 추천 API(POST /api/v1/recommend)의 응답 항목. 추천 덱 1개와 운영 피드백을 나타낸다.
@@ -19,6 +20,8 @@ import java.util.List;
  * @param probabilityTips  현재 레벨에서 이 덱의 고코스트 핵심 기물이 잘 나오지 않을 때의 확률 안내 (레벨 미입력 시 빈 목록)
  * @param roundTip         다음 라운드가 크립 라운드일 때의 안내 (해당 없으면 null)
  * @param actionBriefings  지금 당장 할 행동 가이드 (우선순위 순, 1순위 덱에만 포함되고 나머지 덱은 빈 목록)
+ * @param buildUpGuide     레벨(4~9) -> 그 레벨에서 올릴 추천 기물 (덱 카드 클릭 시 상세 가이드 모달에 표시)
+ * @param unitItemMap      핵심 기물 -> 추천 완성 아이템 (상세 가이드 모달에 표시)
  */
 public record RecommendResponse(
         String compName,
@@ -30,6 +33,8 @@ public record RecommendResponse(
         List<String> interestWarnings,
         List<String> probabilityTips,
         String roundTip,
-        List<String> actionBriefings
+        List<String> actionBriefings,
+        Map<Integer, List<String>> buildUpGuide,
+        Map<String, List<String>> unitItemMap
 ) {
 }

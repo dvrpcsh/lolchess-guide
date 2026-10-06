@@ -15,9 +15,13 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * [역할] 서버 기동 시 meta_comp 테이블의 시즌 18 기본 메타 덱 데이터를 이 클래스의 정의와 일치시키는 시더(Seeder).
@@ -32,6 +36,10 @@ import java.util.stream.Collectors;
  *            - 있는데 티어/기물/아이템/설명이 다르면 UPDATE (meta_comp_core_units 등 컬렉션 테이블도 갱신)
  *            - 같으면 아무 것도 하지 않음 (재기동해도 중복 삽입/불필요한 UPDATE 없음)
  *     --> 3) 기물/아이템 이름이 champion / item 테이블에 없으면 경고 로그 (오타로 매칭 점수가 0이 되는 것을 조기 발견)
+ *            핵심 기물·추천 아이템뿐 아니라 레벨별 빌드업 기물, 기물별 추천 완성 아이템까지 검사한다.
+ *
+ * ※ 빌드업 기물과 기물별 추천 완성 아이템은 Data Dragon 시즌 18 기물/아이템 이름으로 구성한 샘플 운영 가이드이며,
+ *   실제 메타 통계로 검증된 값이 아니다.
  */
 @Slf4j
 @Component
@@ -48,20 +56,56 @@ public class DataInitializer implements ApplicationRunner {
                     Tier.S,
                     List.of("드레이븐", "자야", "애쉬", "아무무", "마오카이"),
                     List.of("곡궁", "B.F. 대검", "쇠사슬 조끼", "연습용 장갑"),
-                    "구인수 필수, 크라켄 및 최후의 속삭임/전역 갑주 조기 제작 추천. 9렙 고밸류 전환 용이."),
+                    "구인수 필수, 크라켄 및 최후의 속삭임/전역 갑주 조기 제작 추천. 9렙 고밸류 전환 용이.",
+                    buildUp(
+                            List.of("자야", "레오나", "바루스", "오른"),
+                            List.of("자야", "레오나", "바루스", "오른", "세주아니"),
+                            List.of("자야", "레오나", "바루스", "세주아니", "아무무", "케이틀린"),
+                            List.of("자야", "바루스", "세주아니", "아무무", "케이틀린", "드레이븐", "말파이트"),
+                            List.of("자야", "바루스", "세주아니", "아무무", "드레이븐", "말파이트", "애쉬", "마오카이"),
+                            List.of("자야", "세주아니", "아무무", "드레이븐", "말파이트", "애쉬", "마오카이", "타릭", "아이번")),
+                    unitItems(
+                            Map.entry("드레이븐", List.of("무한의 대검", "최후의 속삭임", "거인 학살자")),
+                            Map.entry("애쉬", List.of("구인수의 격노검", "크라켄의 분노", "거인 학살자")),
+                            Map.entry("아무무", List.of("가고일 돌갑옷", "워모그의 갑옷", "태양불꽃 망토")))),
             new CompDefinition(
                     "속사포 아펠리오스",
                     Tier.S,
                     List.of("아펠리오스", "바루스", "자야", "아무무"),
                     List.of("B.F. 대검", "연습용 장갑", "거인의 허리띠", "쇠사슬 조끼"),
-                    "자체 공속 증가로 구인수 제작 금지. Pure AD 및 방템 위주 구성."),
+                    "자체 공속 증가로 구인수 제작 금지. Pure AD 및 방템 위주 구성.",
+                    buildUp(
+                            List.of("바루스", "자야", "레오나", "케이틀린"),
+                            List.of("바루스", "자야", "레오나", "케이틀린", "세주아니"),
+                            List.of("바루스", "자야", "레오나", "케이틀린", "세주아니", "아무무"),
+                            List.of("바루스", "자야", "케이틀린", "세주아니", "아무무", "아펠리오스", "시비르"),
+                            List.of("바루스", "자야", "케이틀린", "세주아니", "아무무", "아펠리오스", "시비르", "말파이트"),
+                            List.of("바루스", "자야", "세주아니", "아무무", "아펠리오스", "시비르", "말파이트", "애쉬", "타릭")),
+                    unitItems(
+                            Map.entry("아펠리오스", List.of("무한의 대검", "최후의 속삭임", "거인 학살자")),
+                            Map.entry("바루스", List.of("죽음의 검", "피바라기", "스테락의 도전")),
+                            Map.entry("아무무", List.of("가고일 돌갑옷", "용의 발톱", "워모그의 갑옷")))),
             new CompDefinition(
                     "감시자 아리 모르가나",
                     Tier.A,
                     List.of("아리", "모르가나", "아무무", "알룬"),
                     List.of("쓸데없이 큰 지팡이", "여신의 눈물", "거인의 허리띠", "음전자 망토"),
-                    "모르가나 역병의 보석 핵심. 감시자 암라인과 유연한 4주문술사 전환 가능.")
+                    "모르가나 역병의 보석 핵심. 감시자 암라인과 유연한 4주문술사 전환 가능.",
+                    buildUp(
+                            List.of("카르마", "베이가", "레오나", "쉔"),
+                            List.of("카르마", "베이가", "레오나", "쉔", "르블랑"),
+                            List.of("카르마", "베이가", "레오나", "쉔", "르블랑", "아무무"),
+                            List.of("카르마", "레오나", "쉔", "르블랑", "아무무", "아리", "모르가나"),
+                            List.of("카르마", "쉔", "르블랑", "아무무", "아리", "모르가나", "소라카", "말파이트"),
+                            List.of("쉔", "아무무", "아리", "모르가나", "소라카", "말파이트", "알룬", "럭스", "타릭")),
+                    unitItems(
+                            Map.entry("아리", List.of("푸른 파수꾼", "보석 건틀릿", "라바돈의 죽음모자")),
+                            Map.entry("모르가나", List.of("모렐로노미콘", "정령의 형상", "적응형 투구")),
+                            Map.entry("알룬", List.of("대천사의 지팡이", "보석 건틀릿", "이온 충격기"))))
     );
+
+    // 빌드업 가이드 레벨 범위: 4레벨부터 9레벨까지 순서대로
+    private static final int FIRST_BUILD_UP_LEVEL = 4;
 
     private final MetaCompRepository metaCompRepository;
     private final ChampionRepository championRepository;
@@ -79,9 +123,11 @@ public class DataInitializer implements ApplicationRunner {
             if (existing == null) {
                 metaCompRepository.save(def.toEntity());
                 inserted++;
-            } else if (!existing.hasSameComposition(def.tier(), def.coreUnits(), def.recommendedItems(), def.description())) {
+            } else if (!existing.hasSameComposition(def.tier(), def.coreUnits(), def.recommendedItems(), def.description(),
+                    def.buildUpGuide(), def.unitItemMap())) {
                 // 영속 상태 엔티티이므로 값만 바꾸면 트랜잭션 커밋 시 변경 감지로 UPDATE 된다.
-                existing.updateComposition(def.tier(), def.coreUnits(), def.recommendedItems(), def.description());
+                existing.updateComposition(def.tier(), def.coreUnits(), def.recommendedItems(), def.description(),
+                        def.buildUpGuide(), def.unitItemMap());
                 updated++;
             }
         }
@@ -102,8 +148,15 @@ public class DataInitializer implements ApplicationRunner {
         }
 
         for (CompDefinition def : DEFAULT_COMPS) {
-            List<String> unknownUnits = def.coreUnits().stream().filter(u -> !championNames.contains(u)).toList();
-            List<String> unknownItems = def.recommendedItems().stream().filter(i -> !itemNames.contains(i)).toList();
+            // 핵심 기물 + 빌드업 기물 + 기물별 아이템의 기물 이름 / 추천 아이템 + 기물별 추천 완성 아이템 이름을 모두 검사
+            List<String> unknownUnits = Stream.of(def.coreUnits().stream(),
+                            def.buildUpGuide().values().stream().flatMap(List::stream),
+                            def.unitItemMap().keySet().stream())
+                    .flatMap(Function.identity())
+                    .filter(u -> !championNames.contains(u)).distinct().toList();
+            List<String> unknownItems = Stream.concat(def.recommendedItems().stream(),
+                            def.unitItemMap().values().stream().flatMap(List::stream))
+                    .filter(i -> !itemNames.contains(i)).distinct().toList();
             if (!unknownUnits.isEmpty() || !unknownItems.isEmpty()) {
                 log.warn("[DataInitializer] '{}' 덱에 Data Dragon에 없는 이름이 있습니다. 기물: {}, 아이템: {}",
                         def.name(), unknownUnits, unknownItems);
@@ -114,8 +167,9 @@ public class DataInitializer implements ApplicationRunner {
     /**
      * 초기 메타 덱 한 개의 정의. Entity와 분리하여 "원하는 상태"를 선언적으로 표현한다.
      */
-    private record CompDefinition(String name, Tier tier, List<String> coreUnits,
-                                  List<String> recommendedItems, String description) {
+    private record CompDefinition(String name, Tier tier, List<String> coreUnits, List<String> recommendedItems,
+                                  String description, Map<Integer, List<String>> buildUpGuide,
+                                  Map<String, List<String>> unitItemMap) {
 
         MetaCompEntity toEntity() {
             return MetaCompEntity.builder()
@@ -124,7 +178,33 @@ public class DataInitializer implements ApplicationRunner {
                     .coreUnits(coreUnits)
                     .recommendedItems(recommendedItems)
                     .description(description)
+                    .buildUpGuide(buildUpGuide)
+                    .unitItemMap(unitItemMap)
                     .build();
         }
+    }
+
+    /**
+     * 4레벨부터 순서대로 레벨별 빌드업 기물 목록을 받아 { 4: [...], 5: [...], ... } 맵을 만든다 (순서 유지).
+     */
+    @SafeVarargs
+    private static Map<Integer, List<String>> buildUp(List<String>... unitsByLevel) {
+        Map<Integer, List<String>> guide = new LinkedHashMap<>();
+        for (int i = 0; i < unitsByLevel.length; i++) {
+            guide.put(FIRST_BUILD_UP_LEVEL + i, unitsByLevel[i]);
+        }
+        return guide;
+    }
+
+    /**
+     * 핵심 기물 -> 추천 완성 아이템 맵 (덱에 적은 순서 유지)
+     */
+    @SafeVarargs
+    private static Map<String, List<String>> unitItems(Map.Entry<String, List<String>>... entries) {
+        Map<String, List<String>> map = new LinkedHashMap<>();
+        for (Map.Entry<String, List<String>> entry : entries) {
+            map.put(entry.getKey(), entry.getValue());
+        }
+        return map;
     }
 }

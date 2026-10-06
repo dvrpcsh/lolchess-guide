@@ -413,3 +413,52 @@ button.unit-item:hover { outline: 1px solid var(--tier-s); }
 .coach-badge.is-shop { color: var(--cyan); border-color: rgba(79, 209, 224, 0.6); }
 .coach-badge.is-gold { color: var(--gold); border-color: var(--gold-dim); }
 .coach-badge.is-default { color: var(--text-dim); border-color: var(--panel-border); }
+
+/* ---------- 추천 덱 상세 가이드 모달 ---------- */
+.comp-card.is-clickable { cursor: pointer; transition: border-color 0.15s, transform 0.15s; }
+.comp-card.is-clickable:hover { border-color: var(--gold-dim); transform: translateY(-1px); }
+.comp-card.is-clickable:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.comp-detail-hint { display: block; margin: -4px 0 6px; font-size: 0.72rem; color: var(--text-dim); }
+.comp-card.is-clickable:hover .comp-detail-hint { color: var(--gold); }
+
+.comp-modal {
+  width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0;
+  color: var(--text); background: var(--bg-elevated);
+  border: 1px solid var(--gold-dim); border-radius: 12px; box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+}
+.comp-modal::backdrop { background: rgba(5, 8, 14, 0.72); backdrop-filter: blur(2px); }
+.comp-modal-body { padding: 20px 22px 24px; }
+.comp-modal-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.comp-modal-header h2 { margin: 0; flex: 1; font-size: 1.2rem; color: var(--text-strong); }
+.comp-modal-close { padding: 6px 12px; }
+.guide-section { margin-top: 20px; }
+
+.build-up-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.build-up-row { display: flex; align-items: flex-start; gap: 12px; }
+.level-badge {
+  flex: none; width: 52px; padding: 5px 0; border-radius: 6px; text-align: center;
+  background: var(--panel); border: 1px solid var(--gold-dim); color: var(--gold); font-weight: 800; font-size: 0.8rem;
+}
+.build-up-units { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.build-up-chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px 2px 2px; border-radius: 999px;
+  background: var(--bg); border: 1px solid var(--panel-border); font-size: 0.8rem; color: var(--text-strong);
+}
+.build-up-chip .champion-icon { border-radius: 999px; }
+.build-up-chip.is-carry { border-color: var(--gold); }
+.build-up-chip.is-owned { background: rgba(79, 209, 224, 0.14); border-color: var(--cyan); }
+.guide-legend { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 0.72rem; color: var(--text-dim); }
+.legend-swatch { width: 12px; height: 12px; border-radius: 3px; border: 1px solid; }
+.legend-swatch.is-owned { background: rgba(79, 209, 224, 0.14); border-color: var(--cyan); }
+.legend-swatch.is-carry { margin-left: 8px; border-color: var(--gold); }
+
+.carry-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.carry-card {
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 12px;
+  border-radius: 10px; background: var(--bg); border: 1px solid var(--panel-border);
+}
+.carry-name { font-weight: 700; color: var(--text-strong); }
+.carry-items { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.carry-item { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--text-strong); }
+.carry-item img, .carry-item-fallback { flex: none; width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--gold-dim); }
+.carry-item-fallback { display: grid; place-items: center; background: var(--panel); }

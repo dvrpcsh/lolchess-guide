@@ -81,6 +81,10 @@ export default function App() {
     () => new Map(champions.map((champion) => [champion.championId, champion])),
     [champions],
   )
+  const championByName = useMemo(
+    () => new Map(champions.map((champion) => [champion.name, champion])),
+    [champions],
+  )
   const itemIconByName = useMemo(
     () => new Map([...itemData.components, ...itemData.combined].map((item) => [item.name, item.iconUrl])),
     [itemData],
@@ -202,7 +206,13 @@ export default function App() {
             onResetBoard={() => setLoadout(resetLoadout())}
             onUnequip={handleUnequip}
           />
-          <RecommendationList request={request} refreshKey={refreshKey} onBriefings={setBriefings} />
+          <RecommendationList
+            request={request}
+            refreshKey={refreshKey}
+            onBriefings={setBriefings}
+            championByName={championByName}
+            itemIconByName={itemIconByName}
+          />
         </main>
       </div>
 
