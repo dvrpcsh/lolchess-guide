@@ -40,5 +40,7 @@ spring:
         format_sql: true
         # SQL에 어떤 JPQL에서 생성된 쿼리인지 주석 추가
         use_sql_comments: true
+        # 지연 로딩 컬렉션(coreUnits, recommendedItems)을 덱마다 따로 조회하지 않고 IN 절로 묶어 조회 (N+1 완화)
+        default_batch_fetch_size: 100
     # 뷰 렌더링 시점까지 영속성 컨텍스트를 열어두지 않음 (REST API 전용, 트랜잭션 범위 명확화)
     open-in-view: false
