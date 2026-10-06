@@ -42,19 +42,32 @@ public class ChampionEntity {
     @Column(nullable = false)
     private int cost;
 
+    // 원본 이미지 (1024x512 스플래시, 약 600KB) - 상세 화면 등 큰 이미지가 필요할 때 사용
     @Column(length = 500)
     private String iconUrl;
+
+    // 48x48 썸네일이 모인 스프라이트 시트 URL과 좌표 - 목록/칩처럼 작은 아이콘을 가볍게 표시할 때 사용
+    @Column(length = 500)
+    private String spriteUrl;
+
+    private Integer spriteX;
+
+    private Integer spriteY;
 
     // 이 데이터를 가져온 Data Dragon 패치 버전. 최신 버전과 다르면 재동기화 대상
     @Column(nullable = false, length = 20)
     private String patchVersion;
 
     @Builder
-    private ChampionEntity(String championId, String name, int cost, String iconUrl, String patchVersion) {
+    private ChampionEntity(String championId, String name, int cost, String iconUrl,
+                           String spriteUrl, Integer spriteX, Integer spriteY, String patchVersion) {
         this.championId = championId;
         this.name = name;
         this.cost = cost;
         this.iconUrl = iconUrl;
+        this.spriteUrl = spriteUrl;
+        this.spriteX = spriteX;
+        this.spriteY = spriteY;
         this.patchVersion = patchVersion;
     }
 }

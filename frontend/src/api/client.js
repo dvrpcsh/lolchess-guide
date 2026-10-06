@@ -27,9 +27,19 @@ export async function fetchRecommendations(request, signal) {
 }
 
 /**
- * GET /api/v1/meta-comps - 기물 선택 후보 목록을 만들기 위해 등록된 메타 덱 전체를 조회
+ * GET /api/v1/champions - 시즌 전체 챔피언 목록 (Data Dragon 동기화 데이터, 코스트 순)
+ * @returns {Promise<Array<{championId, name, cost, iconUrl, spriteUrl, spriteX, spriteY}>>}
  */
-export async function fetchMetaComps() {
-  const { data } = await client.get('/api/v1/meta-comps')
+export async function fetchChampions() {
+  const { data } = await client.get('/api/v1/champions')
+  return data
+}
+
+/**
+ * GET /api/v1/items - 재료 아이템 / 조합 아이템 목록 (Data Dragon 동기화 데이터)
+ * @returns {Promise<{ components: Array<{itemId, name, iconUrl}>, combined: Array<{itemId, name, iconUrl}> }>}
+ */
+export async function fetchItems() {
+  const { data } = await client.get('/api/v1/items')
   return data
 }

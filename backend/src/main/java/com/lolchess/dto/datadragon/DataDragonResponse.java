@@ -32,9 +32,12 @@ public record DataDragonResponse(String version, Map<String, Entry> data) {
     }
 
     /**
-     * @param full 아이콘 이미지 파일명 (/cdn/{version}/img/{tft-champion|tft-item}/{full})
+     * @param full   아이콘 이미지 파일명 (/cdn/{version}/img/{tft-champion|tft-item}/{full})
+     * @param sprite 48x48 썸네일이 모여 있는 스프라이트 시트 파일명 (/cdn/{version}/img/sprite/{sprite})
+     * @param x      스프라이트 시트 안에서 썸네일의 x 좌표(px)
+     * @param y      스프라이트 시트 안에서 썸네일의 y 좌표(px)
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Image(String full) {
+    public record Image(String full, String sprite, Integer x, Integer y) {
     }
 }

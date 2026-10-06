@@ -76,38 +76,89 @@ button, input { font: inherit; color: inherit; }
 .ghost-button:hover { border-color: var(--gold-dim); color: var(--text-strong); }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 
+/* ---------- 챔피언 아이콘 / 코스트 색상 ---------- */
+.cost-1 { --cost-color: #9aa4b5; }
+.cost-2 { --cost-color: #3fbf6f; }
+.cost-3 { --cost-color: #3d8bfd; }
+.cost-4 { --cost-color: #b45cf0; }
+.cost-5 { --cost-color: #f0b93c; }
+
+.champion-icon {
+  position: relative; display: inline-block; flex: none; overflow: hidden;
+  border-radius: 6px; background: var(--panel);
+  box-shadow: 0 0 0 1.5px var(--cost-color, var(--panel-border));
+}
+.champion-icon.is-empty { box-shadow: none; outline: 1px dashed var(--panel-border); outline-offset: -1px; opacity: 0.5; }
+.champion-icon-sprite {
+  position: absolute; top: 0; left: 0; width: 48px; height: 48px;
+  background-repeat: no-repeat; transform-origin: top left;
+}
+.champion-icon img { width: 100%; height: 100%; object-fit: cover; }
+
 /* ---------- 기물 입력 ---------- */
 .shop-slots { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) auto; gap: 8px; }
-@media (max-width: 560px) { .shop-slots { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.shop-slot, .custom-unit input {
-  width: 100%; padding: 10px; border-radius: 8px;
+@media (max-width: 640px) { .shop-slots { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.shop-slot {
+  position: relative; display: flex; align-items: center; gap: 6px; min-width: 0;
+  padding: 6px; border-radius: 8px;
+  background: var(--bg); border: 1px solid var(--panel-border); border-bottom: 2px solid var(--gold-dim);
+}
+.shop-slot.is-filled { border-color: var(--cost-color); }
+.shop-slot input {
+  flex: 1; min-width: 0; padding: 4px 2px; border: 0; background: transparent; outline: none;
+}
+.shop-slot:focus-within { outline: 2px solid var(--cyan); outline-offset: 1px; }
+.shop-slot.is-filled input { color: var(--text-strong); font-weight: 600; }
+
+.suggestions {
+  position: absolute; z-index: 10; top: calc(100% + 4px); left: 0; min-width: 100%; width: max-content;
+  max-height: 320px; overflow-y: auto; list-style: none; margin: 0; padding: 4px;
+  background: var(--bg-elevated); border: 1px solid var(--gold-dim); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.suggestions li {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer;
+}
+.suggestions li.is-active { background: rgba(228, 182, 92, 0.15); color: var(--text-strong); }
+.suggestion-cost { margin-left: auto; padding-left: 12px; font-size: 0.75rem; font-weight: 700; color: var(--cost-color); }
+
+.panel-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 20px; margin-bottom: 12px; }
+.panel-title-row .panel-title { margin: 0; }
+.panel-title small { font-size: 0.75rem; color: var(--text-dim); letter-spacing: 0; text-transform: none; font-weight: 400; }
+.search-input {
+  width: 160px; padding: 6px 10px; border-radius: 8px;
   background: var(--bg); border: 1px solid var(--panel-border);
 }
-.shop-slot { text-align: center; border-bottom: 2px solid var(--gold-dim); }
-.shop-slot:not(:placeholder-shown) { border-color: var(--gold); color: var(--text-strong); }
 
+.cost-group { display: flex; gap: 10px; align-items: flex-start; margin-top: 8px; }
+.cost-label { flex: none; width: 52px; padding-top: 6px; font-size: 0.75rem; font-weight: 700; color: var(--cost-color); }
 .unit-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .unit-chip {
-  padding: 6px 12px; border-radius: 999px; cursor: pointer;
-  background: var(--bg); border: 1px solid var(--panel-border); color: var(--text-dim);
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px 3px 3px; border-radius: 999px; cursor: pointer;
+  background: var(--bg); border: 1px solid var(--panel-border); color: var(--text-dim); font-size: 0.85rem;
 }
-.unit-chip:hover { color: var(--text-strong); }
-.unit-chip.is-selected { border-color: var(--cyan); color: var(--cyan); background: rgba(79, 209, 224, 0.1); }
-.custom-unit { display: flex; gap: 8px; margin-top: 12px; }
+.unit-chip .champion-icon { border-radius: 999px; }
+.unit-chip:hover { color: var(--text-strong); border-color: var(--cost-color); }
+.unit-chip.is-selected {
+  border-color: var(--cyan); color: var(--text-strong); background: rgba(79, 209, 224, 0.14);
+  box-shadow: 0 0 8px rgba(79, 209, 224, 0.35);
+}
 
 /* ---------- 아이템 입력 ---------- */
 .item-grid {
   list-style: none; margin: 0; padding: 0;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px;
 }
 .item-card {
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 12px 8px; border-radius: 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 10px 8px; border-radius: 8px;
   background: var(--bg); border: 1px solid var(--panel-border);
 }
 .item-card.is-owned { border-color: var(--gold); box-shadow: 0 0 0 1px rgba(228, 182, 92, 0.25); }
-.item-icon { font-size: 1.6rem; line-height: 1; }
-.item-name { font-size: 0.8rem; text-align: center; min-height: 2.4em; color: var(--text-strong); }
+.item-icon { width: 36px; height: 36px; border-radius: 6px; border: 1px solid var(--panel-border); }
+.item-card.is-owned .item-icon { border-color: var(--gold); }
+.item-name { font-size: 0.8rem; text-align: center; color: var(--text-strong); }
 .counter { display: flex; align-items: center; gap: 6px; }
 .counter button {
   width: 28px; height: 28px; border-radius: 6px; cursor: pointer;

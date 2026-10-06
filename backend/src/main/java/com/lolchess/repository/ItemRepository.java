@@ -13,8 +13,5 @@ import java.util.List;
  */
 public interface ItemRepository extends JpaRepository<ItemEntity, Long> {
 
-    // 저장된 데이터 중 최신 패치 버전이 아닌 행이 하나라도 있으면 재동기화 필요
-    boolean existsByPatchVersionNot(String patchVersion);
-
     List<ItemEntity> findAllByOrderByNameAsc();
 }
