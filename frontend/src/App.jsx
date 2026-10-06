@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { INITIAL_GAME_STATE, toGameStateRequest } from './gameState'
+import GameStatePanel from './components/GameStatePanel'
 import ItemSelector from './components/ItemSelector'
 import UnitSelector from './components/UnitSelector'
 import RecommendationList from './components/RecommendationList'
@@ -10,6 +12,7 @@ const SHOP_SIZE = 5
  *   입력 컴포넌트와 추천 결과 컴포넌트를 연결한다.
  *
  * [Data Flow]
+ *   GameStatePanel(레벨/골드/스테이지)은 입력값만 관리하고 요청 시 toGameStateRequest()로 변환
  *   UnitSelector(GET /api/v1/champions) / ItemSelector(GET /api/v1/items)가 각자 선택 후보를 불러옴
  *   사용자 입력 --onChange--> App 상태 갱신
  *     --> 빈 칸 제거한 request 객체 생성 --> RecommendationList가 POST /api/v1/recommend 재요청
@@ -18,18 +21,21 @@ export default function App() {
   const [shopUnits, setShopUnits] = useState(Array(SHOP_SIZE).fill(''))
   const [boardUnits, setBoardUnits] = useState([])
   const [itemCounts, setItemCounts] = useState({})
+  const [gameState, setGameState] = useState(INITIAL_GAME_STATE)
   const [refreshKey, setRefreshKey] = useState(0)
 
   const request = {
     shopUnits: shopUnits.map((unit) => unit.trim()).filter(Boolean),
     boardUnits,
     itemCounts,
+    ...toGameStateRequest(gameState),
   }
 
   const resetAll = () => {
     setShopUnits(Array(SHOP_SIZE).fill(''))
     setBoardUnits([])
     setItemCounts({})
+    setGameState(INITIAL_GAME_STATE)
   }
 
   return (
@@ -49,6 +55,7 @@ export default function App() {
 
       <main className="layout">
         <div className="inputs">
+          <GameStatePanel gameState={gameState} onChange={setGameState} />
           <UnitSelector
             shopUnits={shopUnits}
             boardUnits={boardUnits}

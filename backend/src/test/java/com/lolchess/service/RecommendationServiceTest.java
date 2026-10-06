@@ -2,9 +2,12 @@ package com.lolchess.service;
 
 import com.lolchess.dto.RecommendRequest;
 import com.lolchess.dto.RecommendResponse;
+import com.lolchess.entity.ChampionEntity;
 import com.lolchess.entity.MetaCompEntity;
 import com.lolchess.entity.Tier;
+import com.lolchess.repository.ChampionRepository;
 import com.lolchess.repository.MetaCompRepository;
+import com.lolchess.rule.TftSystemRuleEngine;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -34,7 +37,11 @@ class RecommendationServiceTest {
                 MetaCompEntity.builder().name("B덱").tier(Tier.B)
                         .coreUnits(List.of("아리")).recommendedItems(List.of("여신의 눈물")).build()
         ));
-        service = new RecommendationService(repository);
+        ChampionRepository championRepository = Mockito.mock(ChampionRepository.class);
+        when(championRepository.findAll()).thenReturn(List.of(
+                champion("드레이븐", 5), champion("브랜드", 3), champion("아펠리오스", 4),
+                champion("트위치", 2), champion("아리", 4)));
+        service = new RecommendationService(repository, championRepository, new TftSystemRuleEngine());
     }
 
     @Test
@@ -59,5 +66,36 @@ class RecommendationServiceTest {
     @Test
     void 아무것도_일치하지_않으면_티어와_관계없이_빈_목록을_반환한다() {
         assertThat(service.recommend(new RecommendRequest(null, null, null))).isEmpty();
+    }
+
+    @Test
+    void 골드_레벨_스테이지를_입력하면_이자_확률_라운드_피드백을_포함한다() {
+        RecommendRequest request = new RecommendRequest(
+                List.of("브랜드"), List.of(), Map.of(), 7, 32, "3-6");
+
+        RecommendResponse sComp = service.recommend(request).get(0);
+
+        // 브랜드(3코) 구매: 32원 -> 29원, 이자 3 -> 2
+        assertThat(sComp.interestWarnings())
+                .containsExactly("⚠️ [브랜드] 이 기물을 사면 이자 1골드를 손해봅니다 (현재 32원 -> 구매 후 29원)");
+        // 미보유 5코 드레이븐: 7레벨 등장 확률 1%
+        assertThat(sComp.probabilityTips())
+                .containsExactly("💡 현재 레벨(7렙)에서 5코스트 등장 확률은 1%입니다. (드레이븐)");
+        // 3-6 다음은 3-7 크립 라운드
+        assertThat(sComp.roundTip()).startsWith("🐉 다음 라운드는 크립 라운드입니다.");
+    }
+
+    @Test
+    void 골드_레벨_스테이지를_입력하지_않으면_피드백이_비어_있다() {
+        RecommendResponse sComp = service.recommend(
+                new RecommendRequest(List.of("브랜드"), List.of(), Map.of())).get(0);
+
+        assertThat(sComp.interestWarnings()).isEmpty();
+        assertThat(sComp.probabilityTips()).isEmpty();
+        assertThat(sComp.roundTip()).isNull();
+    }
+
+    private static ChampionEntity champion(String name, int cost) {
+        return ChampionEntity.builder().championId("TEST_" + name).name(name).cost(cost).patchVersion("test").build();
     }
 }

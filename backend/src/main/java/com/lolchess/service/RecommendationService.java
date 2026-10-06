@@ -3,9 +3,12 @@ package com.lolchess.service;
 import com.lolchess.dto.MetaCompResponse;
 import com.lolchess.dto.RecommendRequest;
 import com.lolchess.dto.RecommendResponse;
+import com.lolchess.entity.ChampionEntity;
 import com.lolchess.entity.MetaCompEntity;
 import com.lolchess.entity.Tier;
+import com.lolchess.repository.ChampionRepository;
 import com.lolchess.repository.MetaCompRepository;
+import com.lolchess.rule.TftSystemRuleEngine;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,18 +21,21 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * [역할] 사용자의 현재 게임 상황(상점/보유 기물, 보유 아이템)과 DB의 메타 덱을 비교해
- *   가장 적합한 덱을 점수순으로 추천하는 비즈니스 로직 계층.
+ * [역할] 사용자의 현재 게임 상황(상점/보유 기물, 보유 아이템, 레벨/골드/스테이지)과 DB의 메타 덱을 비교해
+ *   가장 적합한 덱을 점수순으로 추천하고, TFT 시스템 규칙에 따른 운영 피드백을 덧붙이는 비즈니스 로직 계층.
  *
  * [Data Flow]
  *   RecommendationController --> recommend(RecommendRequest)
  *     --> MetaCompRepository.findAll() 로 전체 메타 덱 조회 (MySQL meta_comp + 컬렉션 테이블)
+ *     --> ChampionRepository.findAll() 로 기물 이름 -> 코스트 맵 구성 (Data Dragon 동기화 데이터)
  *     --> 덱마다 기물/아이템/티어 점수 계산
  *     --> 매칭 점수(기물+아이템)가 0점인 덱 제외 --> 총점 내림차순 정렬
+ *     --> TftSystemRuleEngine으로 덱별 피드백(이자 경고, 확률 팁, 크립 라운드 안내) 생성
  *     --> RecommendResponse DTO 목록으로 변환하여 Controller에 반환
  *
  * [점수 규칙]
@@ -39,6 +45,11 @@ import java.util.stream.Collectors;
  *   - 티어 점수  : S +10, A +5, B +0
  *   티어 점수는 "현재 상황과의 일치도"가 아니므로, 기물/아이템이 하나도 맞지 않는 덱은
  *   티어와 관계없이 결과에서 제외한다. (빈 요청에 S티어 덱이 무조건 추천되는 것을 방지)
+ *
+ * [피드백 규칙]
+ *   - 이자 경고 : 골드 입력 시, 매수 추천 기물을 하나 샀을 때 이자 구간이 내려가면 경고
+ *   - 확률 팁   : 레벨 입력 시, 아직 보유하지 않은 4~5코스트 핵심 기물의 등장 확률이 20% 미만이면 안내
+ *   - 라운드 안내: 스테이지 입력 시, 다음 라운드가 크립 라운드면 골드 모으기 권장
  */
 @Service
 @RequiredArgsConstructor
@@ -49,7 +60,12 @@ public class RecommendationService {
     private static final int SHOP_UNIT_SCORE = 10;
     private static final int ITEM_SCORE = 15;
 
+    private static final int HIGH_COST_THRESHOLD = 4;      // 확률 팁 대상 코스트 (4코 이상)
+    private static final int LOW_PROBABILITY_PERCENT = 20; // 이 확률 미만이면 "잘 안 나온다"로 판단
+
     private final MetaCompRepository metaCompRepository;
+    private final ChampionRepository championRepository;
+    private final TftSystemRuleEngine ruleEngine;
 
     /**
      * 현재 게임 상황에 맞는 메타 덱을 총점 내림차순으로 반환한다.
@@ -62,12 +78,19 @@ public class RecommendationService {
                 .filter(e -> e.getKey() != null && e.getValue() != null && e.getValue() > 0)
                 .collect(Collectors.toMap(e -> e.getKey().trim(), Map.Entry::getValue, Integer::sum));
 
+        Map<String, Integer> unitCosts = championRepository.findAll().stream()
+                .collect(Collectors.toMap(ChampionEntity::getName, ChampionEntity::getCost, (a, b) -> a));
+        String roundTip = buildRoundTip(request.currentStage());
+
         return metaCompRepository.findAll().stream()
                 .map(comp -> score(comp, boardUnits, shopUnits, itemCounts))
                 .filter(scored -> scored.matchScore() > 0)
                 .sorted(Comparator.comparingInt(ScoredComp::totalScore).reversed()
                         .thenComparing(scored -> scored.comp().getTier())) // 동점이면 상위 티어 우선
-                .map(ScoredComp::toResponse)
+                .map(scored -> scored.toResponse(
+                        buildInterestWarnings(scored.unitsToBuy(), unitCosts, request.currentGold()),
+                        buildProbabilityTips(scored.comp().getCoreUnits(), boardUnits, unitCosts, request.currentLevel()),
+                        roundTip))
                 .toList();
     }
 
@@ -109,6 +132,62 @@ public class RecommendationService {
         return new ScoredComp(comp, matchScore, tierBonus(comp.getTier()), unitsToBuy, matchedItems);
     }
 
+    /**
+     * 매수 추천 기물을 각각 하나씩 샀을 때 이자 구간이 깨지면 경고 메시지를 만든다.
+     * 골드가 없거나(미입력) 코스트를 모르는 기물, 골드가 부족해 살 수 없는 기물은 제외한다.
+     */
+    private List<String> buildInterestWarnings(List<String> unitsToBuy, Map<String, Integer> unitCosts, Integer gold) {
+        if (gold == null || gold < 0) {
+            return List.of();
+        }
+        List<String> warnings = new ArrayList<>();
+        for (String unit : unitsToBuy) {
+            Integer cost = unitCosts.get(unit);
+            if (cost == null || cost > gold || !ruleEngine.willBreakInterest(gold, cost)) {
+                continue;
+            }
+            warnings.add("⚠️ [%s] 이 기물을 사면 이자 %d골드를 손해봅니다 (현재 %d원 -> 구매 후 %d원)"
+                    .formatted(unit, ruleEngine.calculateInterestLoss(gold, cost), gold, gold - cost));
+        }
+        return warnings;
+    }
+
+    /**
+     * 아직 보유하지 않은 고코스트 핵심 기물이 현재 레벨에서 잘 나오지 않으면 코스트별로 확률을 안내한다.
+     */
+    private List<String> buildProbabilityTips(List<String> coreUnits, Set<String> boardUnits,
+                                              Map<String, Integer> unitCosts, Integer level) {
+        if (level == null || level < TftSystemRuleEngine.MIN_LEVEL || level > TftSystemRuleEngine.MAX_LEVEL) {
+            return List.of();
+        }
+        // 코스트 -> 해당 코스트의 미보유 핵심 기물 (코스트 오름차순)
+        Map<Integer, List<String>> missingByCost = new TreeMap<>();
+        for (String unit : coreUnits) {
+            Integer cost = unitCosts.get(unit);
+            if (cost != null && cost >= HIGH_COST_THRESHOLD && !boardUnits.contains(unit)) {
+                missingByCost.computeIfAbsent(cost, c -> new ArrayList<>()).add(unit);
+            }
+        }
+
+        List<String> tips = new ArrayList<>();
+        missingByCost.forEach((cost, units) -> {
+            int probability = ruleEngine.getShopProbability(level, cost);
+            if (probability < LOW_PROBABILITY_PERCENT) {
+                tips.add("💡 현재 레벨(%d렙)에서 %d코스트 등장 확률은 %d%%입니다. (%s)"
+                        .formatted(level, cost, probability, String.join(", ", units)));
+            }
+        });
+        return tips;
+    }
+
+    // 다음 라운드가 크립 라운드면 안내 메시지, 아니면 null
+    private String buildRoundTip(String currentStage) {
+        return ruleEngine.nextRound(currentStage)
+                .filter(ruleEngine::isPveRound)
+                .map(next -> "🐉 다음 라운드는 크립 라운드입니다. 골드 모으기를 권장합니다. (" + next + ")")
+                .orElse(null);
+    }
+
     private int tierBonus(Tier tier) {
         return switch (tier) {
             case S -> 10;
@@ -140,14 +219,17 @@ public class RecommendationService {
             return matchScore + tierBonus;
         }
 
-        RecommendResponse toResponse() {
+        RecommendResponse toResponse(List<String> interestWarnings, List<String> probabilityTips, String roundTip) {
             return new RecommendResponse(
                     comp.getName(),
                     comp.getTier().name(),
                     totalScore(),
                     unitsToBuy,
                     List.copyOf(matchedItems),
-                    comp.getDescription()
+                    comp.getDescription(),
+                    interestWarnings,
+                    probabilityTips,
+                    roundTip
             );
         }
     }

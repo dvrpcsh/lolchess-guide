@@ -10,7 +10,9 @@ const DEBOUNCE_MS = 300
  *   App --request({ shopUnits, boardUnits, itemCounts }), refreshKey--> RecommendationList
  *     --> 입력이 멈추고 300ms 후 POST /api/v1/recommend (이전 요청은 AbortController로 취소)
  *     --> Spring Boot RecommendationService가 점수순 List<RecommendResponse> 반환
- *     --> 카드로 렌더링: 덱 이름, 티어, 점수, 사야 할 기물(상점 하이라이트), 적합 아이템, 운영 팁
+ *     --> 카드로 렌더링: 덱 이름, 티어, 점수, 사야 할 기물(상점 하이라이트), 적합 아이템, 운영 팁,
+ *         이자 손실 경고 뱃지(interestWarnings), 레벨별 확률 팁(probabilityTips)
+ *     --> 크립 라운드 안내(roundTip)는 모든 덱에 공통이므로 목록 위에 한 번만 표시
  *   refreshKey는 "추천 받기" 버튼 클릭 시 증가하여 입력 변경 없이도 재요청하게 한다.
  */
 export default function RecommendationList({ request, refreshKey }) {
@@ -53,6 +55,8 @@ export default function RecommendationList({ request, refreshKey }) {
         <p className="message">일치하는 덱이 없습니다. 상점 기물이나 보유 아이템을 입력해 보세요.</p>
       )}
 
+      {results[0]?.roundTip && <p className="round-banner">{results[0].roundTip}</p>}
+
       <ol className="comp-list">
         {results.map((comp, index) => (
           <li key={comp.compName} className={`comp-card tier-${comp.tier.toLowerCase()}`}>
@@ -75,6 +79,20 @@ export default function RecommendationList({ request, refreshKey }) {
                 ? comp.matchedItems.map((item) => <span key={item} className="tag tag-item">{item}</span>)
                 : <span className="row-empty">없음</span>}
             </div>
+            {comp.interestWarnings?.length > 0 && (
+              <ul className="feedback-list">
+                {comp.interestWarnings.map((warning) => (
+                  <li key={warning} className="badge-warning">{warning}</li>
+                ))}
+              </ul>
+            )}
+            {comp.probabilityTips?.length > 0 && (
+              <ul className="feedback-list">
+                {comp.probabilityTips.map((tip) => (
+                  <li key={tip} className="badge-tip">{tip}</li>
+                ))}
+              </ul>
+            )}
             {comp.description && <p className="comp-tip">{comp.description}</p>}
           </li>
         ))}

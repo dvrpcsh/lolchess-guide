@@ -212,3 +212,27 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outl
   margin: 12px 0 0; padding: 10px 12px; border-radius: 6px;
   background: var(--panel); font-size: 0.85rem; line-height: 1.6; white-space: pre-line;
 }
+
+/* ---------- 게임 상태 입력 ---------- */
+.game-state { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; }
+.state-field { display: flex; align-items: center; gap: 10px; }
+.state-label { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.08em; color: var(--gold); }
+.state-input {
+  width: 48px; padding: 6px 8px; border-radius: 8px; text-align: center;
+  background: var(--bg); border: 1px solid var(--panel-border);
+  font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-strong);
+}
+.state-input.gold { width: 64px; color: var(--gold); }
+.state-input.stage { width: 64px; }
+.state-input.is-invalid { border-color: var(--tier-s); }
+
+/* ---------- 추천 피드백 ---------- */
+.round-banner {
+  margin: 0 0 12px; padding: 10px 12px; border-radius: 8px;
+  background: rgba(63, 191, 111, 0.12); border: 1px solid rgba(63, 191, 111, 0.45);
+  color: #8be0a9; font-size: 0.85rem; font-weight: 600;
+}
+.feedback-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.badge-warning, .badge-tip { padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; line-height: 1.5; }
+.badge-warning { color: #ffb4b4; background: rgba(255, 107, 107, 0.12); border: 1px solid rgba(255, 107, 107, 0.45); }
+.badge-tip { color: #c6dcff; background: rgba(111, 168, 255, 0.1); border: 1px solid rgba(111, 168, 255, 0.4); }
