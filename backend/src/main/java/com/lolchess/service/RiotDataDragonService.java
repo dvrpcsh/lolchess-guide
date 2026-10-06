@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
  *   RiotDataSyncRunner(서버 기동) --> syncIfOutdated()
  *     1) GET /api/versions.json --> 최신 패치 버전 (예: 16.19.1)
  *     2) GET /cdn/{version}/data/ko_KR/tft-champion.json, tft-item.json --> DataDragonResponse
- *     3) 최신 시즌 챔피언(몬스터/변형 제외) / 기본 아이템만 골라 Entity로 변환
+ *     3) 최신 시즌 상점 기물 / 기본 아이템만 골라 Entity로 변환
  *     4) DB에 저장된 내용과 비교 --> 완전히 같으면 종료
  *        (패치 버전뿐 아니라 내용을 비교하므로, 필터 규칙을 바꾸면 같은 패치여도 자동으로 재동기화된다)
  *     5) 하나의 트랜잭션에서 기존 champion/item 행 삭제 후 새 데이터 저장
@@ -58,12 +58,8 @@ public class RiotDataDragonService {
     // 챔피언 key 예: Maps/Shipping/Map22/Sets/TFTSet18/Shop/DA_Draven18 -> 시즌 번호 18 추출
     private static final Pattern SET_SHOP_KEY = Pattern.compile("/Sets/TFTSet(\\d+)/Shop/");
 
-    // 상점 데이터에 함께 들어 있지만 플레이어가 구매하는 기물이 아닌 정글 몬스터 (시즌 18 기준)
-    private static final Set<String> MONSTER_BLACKLIST = Set.of(
-            "심술두꺼비", "어스름늑대", "조약돌", "불타는 묘목", "바위 게",
-            "돌거북", "파수꾼", "덩굴정령", "어미 부리", "장로 드래곤");
-    // "럭스 (지옥불)" 처럼 이름에 괄호가 있는 항목은 기본 챔피언의 변형이므로 기본형("럭스")만 남긴다.
-    private static final String VARIANT_NAME_MARKER = "(";
+    // ※ 시즌 18 상점 데이터의 협곡야수(장로 드래곤, 바위 게 등)와 럭스 변형(럭스 (달빛) 등)은
+    //   lolchess.gg 메타 덱에서도 실제 기물로 쓰이므로 제외하지 않는다. (상점 경로 밖의 소환물은 애초에 포함되지 않음)
 
     // 기본 아이템 id 접두사. 증강/유물/시즌 한정 아이템 등은 다른 접두사를 사용하므로 제외된다.
     private static final String STANDARD_ITEM_PREFIX = "TFT_Item_";
@@ -169,7 +165,6 @@ public class RiotDataDragonService {
     /**
      * 챔피언 데이터에는 튜토리얼과 과거 시즌 챔피언이 모두 섞여 있으므로,
      * key 경로의 시즌 번호(TFTSet{n})가 가장 큰 시즌의 상점(Shop) 기물만 남긴다.
-     * 그중 정글 몬스터(MONSTER_BLACKLIST)와 괄호가 붙은 변형 챔피언은 구매 가능한 기물이 아니므로 제외한다.
      */
     private List<ChampionEntity> toChampionEntities(DataDragonResponse response, String version) {
         int latestSet = response.data().keySet().stream()
@@ -183,7 +178,7 @@ public class RiotDataDragonService {
         // 같은 id가 여러 key로 존재할 수 있어 id 기준으로 중복 제거
         Map<String, ChampionEntity> champions = new LinkedHashMap<>();
         response.data().forEach((key, entry) -> {
-            if (key.contains(latestSetPath) && entry.cost() != null && isPurchasableChampion(entry.name())) {
+            if (key.contains(latestSetPath) && entry.cost() != null && hasText(entry.name())) {
                 DataDragonResponse.Image image = entry.image();
                 boolean hasSprite = image != null && hasText(image.sprite());
                 champions.putIfAbsent(entry.id(), ChampionEntity.builder()
@@ -223,12 +218,6 @@ public class RiotDataDragonService {
                         .patchVersion(version)
                         .build())
                 .toList();
-    }
-
-    private boolean isPurchasableChampion(String name) {
-        return hasText(name)
-                && !MONSTER_BLACKLIST.contains(name.trim())
-                && !name.contains(VARIANT_NAME_MARKER);
     }
 
     private String iconUrl(String format, String version, DataDragonResponse.Entry entry) {

@@ -12,9 +12,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
+
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,8 +36,10 @@ import java.util.stream.Stream;
  * [Data Flow]
  *   Spring Boot 기동 --> RiotDataSyncRunner(@Order(1))가 champion / item 테이블 동기화
  *     --> DataInitializer.run() (@Order(2))
+ *     --> 0) 시드 덱 목록 = 코드에 정의한 DEFAULT_COMPS + classpath:data/meta-comps-lolchess.json
+ *            (lolchess.gg 메타 가이드에서 수집한 덱. 기물/아이템 이름은 Data Dragon 이름으로 변환되어 있음)
  *     --> 1) 이름이 바뀌어 더 이상 쓰지 않는 예전 초기 덱(LEGACY_COMP_NAMES) 삭제
- *     --> 2) DEFAULT_COMPS를 덱 이름 기준으로 조회
+ *     --> 2) 시드 덱을 덱 이름 기준으로 조회
  *            - 없으면 INSERT
  *            - 있는데 티어/기물/아이템/설명이 다르면 UPDATE (meta_comp_core_units 등 컬렉션 테이블도 갱신)
  *            - 같으면 아무 것도 하지 않음 (재기동해도 중복 삽입/불필요한 UPDATE 없음)
@@ -111,14 +119,19 @@ public class DataInitializer implements ApplicationRunner {
     private final ChampionRepository championRepository;
     private final ItemRepository itemRepository;
 
+    // lolchess.gg 메타 가이드에서 수집한 시즌 18 덱 (수집 출처·버전은 파일 상단 source / sourceVersion 참고)
+    private static final String LOLCHESS_SEED_PATH = "data/meta-comps-lolchess.json";
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        List<CompDefinition> seedComps = loadSeedComps();
         metaCompRepository.deleteByNameIn(LEGACY_COMP_NAMES);
 
         int inserted = 0;
         int updated = 0;
-        for (CompDefinition def : DEFAULT_COMPS) {
+        for (CompDefinition def : seedComps) {
             MetaCompEntity existing = metaCompRepository.findByName(def.name()).orElse(null);
             if (existing == null) {
                 metaCompRepository.save(def.toEntity());
@@ -131,13 +144,13 @@ public class DataInitializer implements ApplicationRunner {
                 updated++;
             }
         }
-        log.info("[DataInitializer] 기본 메타 덱 {}개 확인: 신규 {}개, 갱신 {}개", DEFAULT_COMPS.size(), inserted, updated);
+        log.info("[DataInitializer] 기본 메타 덱 {}개 확인: 신규 {}개, 갱신 {}개", seedComps.size(), inserted, updated);
 
-        warnUnknownNames();
+        warnUnknownNames(seedComps);
     }
 
     // 초기 데이터의 기물/아이템 이름이 Data Dragon 동기화 데이터에 존재하는지 검사
-    private void warnUnknownNames() {
+    private void warnUnknownNames(List<CompDefinition> seedComps) {
         Set<String> championNames = championRepository.findAll().stream()
                 .map(ChampionEntity::getName).collect(Collectors.toSet());
         Set<String> itemNames = itemRepository.findAll().stream()
@@ -147,7 +160,7 @@ public class DataInitializer implements ApplicationRunner {
             return;
         }
 
-        for (CompDefinition def : DEFAULT_COMPS) {
+        for (CompDefinition def : seedComps) {
             // 핵심 기물 + 빌드업 기물 + 기물별 아이템의 기물 이름 / 추천 아이템 + 기물별 추천 완성 아이템 이름을 모두 검사
             List<String> unknownUnits = Stream.of(def.coreUnits().stream(),
                             def.buildUpGuide().values().stream().flatMap(List::stream),
@@ -167,7 +180,34 @@ public class DataInitializer implements ApplicationRunner {
     /**
      * 초기 메타 덱 한 개의 정의. Entity와 분리하여 "원하는 상태"를 선언적으로 표현한다.
      */
-    private record CompDefinition(String name, Tier tier, List<String> coreUnits, List<String> recommendedItems,
+    /**
+     * 코드 정의 덱 + lolchess.gg 수집 덱을 합친다. 같은 이름이 있으면 코드 정의가 우선한다.
+     * JSON 파일을 읽지 못하면 경고만 남기고 코드 정의 덱만 사용한다.
+     */
+    private List<CompDefinition> loadSeedComps() {
+        Map<String, CompDefinition> byName = new LinkedHashMap<>();
+        DEFAULT_COMPS.forEach(def -> byName.put(def.name(), def));
+        try (InputStream in = new ClassPathResource(LOLCHESS_SEED_PATH).getInputStream()) {
+            SeedFile file = JSON.readValue(in, SeedFile.class);
+            for (CompDefinition def : file.comps()) {
+                if (byName.putIfAbsent(def.name(), def) != null) {
+                    log.warn("[DataInitializer] '{}' 덱 이름이 코드 정의 덱과 겹쳐 lolchess.gg 데이터를 건너뜁니다.", def.name());
+                }
+            }
+            log.info("[DataInitializer] {} ({}) 덱 {}개를 불러왔습니다.", file.source(), file.sourceVersion(), file.comps().size());
+        } catch (IOException | JacksonException e) {
+            log.warn("[DataInitializer] {} 을(를) 읽지 못해 코드 정의 덱만 사용합니다. 원인: {}", LOLCHESS_SEED_PATH, e.getMessage());
+        }
+        return List.copyOf(byName.values());
+    }
+
+    /**
+     * classpath:data/meta-comps-lolchess.json 파일 구조
+     */
+    record SeedFile(String source, String sourceVersion, String collectedAt, List<CompDefinition> comps) {
+    }
+
+    record CompDefinition(String name, Tier tier, List<String> coreUnits, List<String> recommendedItems,
                                   String description, Map<Integer, List<String>> buildUpGuide,
                                   Map<String, List<String>> unitItemMap) {
 
