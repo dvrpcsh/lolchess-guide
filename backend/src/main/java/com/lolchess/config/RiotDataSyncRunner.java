@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 
@@ -13,13 +14,14 @@ import org.springframework.web.client.RestClientException;
  *
  * [Data Flow]
  *   Spring Boot 기동 완료 --> run() --> RiotDataDragonService.syncIfOutdated()
- *     --> DB가 비어 있거나 패치 버전이 다르면 Data Dragon에서 받아 champion / item 테이블 갱신
+ *     --> Data Dragon 최신 데이터를 정제한 결과가 DB와 다르면 champion / item 테이블 갱신
  *
  * 네트워크 오류 등으로 동기화에 실패해도 서버는 계속 기동한다.
  * (이전에 저장된 데이터가 있으면 그 데이터로 API가 응답하고, 다음 기동 때 다시 동기화를 시도한다.)
  */
 @Slf4j
 @Component
+@Order(1) // 챔피언/아이템 데이터를 먼저 동기화해야 메타 덱 초기 데이터의 이름 검증(DataInitializer, @Order(2))이 가능하다
 @RequiredArgsConstructor
 public class RiotDataSyncRunner implements ApplicationRunner {
 

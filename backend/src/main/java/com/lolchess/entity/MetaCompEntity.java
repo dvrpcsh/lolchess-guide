@@ -19,6 +19,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * [역할] TFT 메타 덱(추천 조합) 한 건을 표현하는 영속성 객체.
@@ -82,5 +83,28 @@ public class MetaCompEntity {
         this.coreUnits = coreUnits != null ? new ArrayList<>(coreUnits) : new ArrayList<>();
         this.recommendedItems = recommendedItems != null ? new ArrayList<>(recommendedItems) : new ArrayList<>();
         this.description = description;
+    }
+
+    /**
+     * 덱 구성(티어, 핵심 기물, 추천 아이템, 설명)을 새 값으로 교체한다.
+     * 컬렉션은 Hibernate가 추적 중인 인스턴스를 유지한 채 내용만 바꿔야 변경 감지가 정상 동작한다.
+     */
+    public void updateComposition(Tier tier, List<String> coreUnits, List<String> recommendedItems, String description) {
+        this.tier = tier;
+        this.coreUnits.clear();
+        this.coreUnits.addAll(coreUnits);
+        this.recommendedItems.clear();
+        this.recommendedItems.addAll(recommendedItems);
+        this.description = description;
+    }
+
+    /**
+     * 저장된 구성이 주어진 값과 완전히 같은지 비교한다. (같으면 불필요한 UPDATE를 생략하기 위함)
+     */
+    public boolean hasSameComposition(Tier tier, List<String> coreUnits, List<String> recommendedItems, String description) {
+        return this.tier == tier
+                && this.coreUnits.equals(coreUnits)
+                && this.recommendedItems.equals(recommendedItems)
+                && Objects.equals(this.description, description);
     }
 }
