@@ -18,6 +18,7 @@ import java.util.List;
  * @param interestWarnings 매수 추천 기물을 샀을 때 이자 구간이 깨지는 경우의 경고 (골드 미입력 시 빈 목록)
  * @param probabilityTips  현재 레벨에서 이 덱의 고코스트 핵심 기물이 잘 나오지 않을 때의 확률 안내 (레벨 미입력 시 빈 목록)
  * @param roundTip         다음 라운드가 크립 라운드일 때의 안내 (해당 없으면 null)
+ * @param actionBriefings  지금 당장 할 행동 가이드 (우선순위 순, 1순위 덱에만 포함되고 나머지 덱은 빈 목록)
  */
 public record RecommendResponse(
         String compName,
@@ -28,6 +29,7 @@ public record RecommendResponse(
         String description,
         List<String> interestWarnings,
         List<String> probabilityTips,
-        String roundTip
+        String roundTip,
+        List<String> actionBriefings
 ) {
 }

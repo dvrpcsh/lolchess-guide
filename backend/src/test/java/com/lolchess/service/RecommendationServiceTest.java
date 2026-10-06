@@ -46,7 +46,9 @@ class RecommendationServiceTest {
         when(itemRecipeService.getComponentsByCompletedName()).thenReturn(Map.of(
                 "구인수의 격노검", List.of("곡궁", "쓸데없이 큰 지팡이"),
                 "붉은 덩굴정령", List.of("곡궁", "곡궁")));
-        service = new RecommendationService(repository, championRepository, new TftSystemRuleEngine(), itemRecipeService);
+        TftSystemRuleEngine ruleEngine = new TftSystemRuleEngine();
+        service = new RecommendationService(repository, championRepository, ruleEngine, itemRecipeService,
+                new ActionableGuideService(itemRecipeService, ruleEngine));
     }
 
     @Test

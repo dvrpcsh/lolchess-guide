@@ -12,10 +12,11 @@ const DEBOUNCE_MS = 300
  *     --> Spring Boot RecommendationService가 점수순 List<RecommendResponse> 반환
  *     --> 카드로 렌더링: 덱 이름, 티어, 점수, 사야 할 기물(상점 하이라이트), 적합 아이템, 운영 팁,
  *         이자 손실 경고 뱃지(interestWarnings), 레벨별 확률 팁(probabilityTips)
- *     --> 크립 라운드 안내(roundTip)는 모든 덱에 공통이므로 목록 위에 한 번만 표시
+ *     --> 1순위 덱의 actionBriefings(실시간 행동 가이드)는 onBriefings로 App에 올려 화면 상단 코치 배너에 표시
+ *         (크립 라운드 안내도 코치 브리핑의 골드 킵 가이드에 포함되므로 목록 위 별도 배너는 두지 않음)
  *   refreshKey는 "추천 받기" 버튼 클릭 시 증가하여 입력 변경 없이도 재요청하게 한다.
  */
-export default function RecommendationList({ request, refreshKey }) {
+export default function RecommendationList({ request, refreshKey, onBriefings }) {
   const [results, setResults] = useState([])
   const [status, setStatus] = useState('idle') // idle | loading | done | error
 
@@ -27,11 +28,14 @@ export default function RecommendationList({ request, refreshKey }) {
     const timer = setTimeout(async () => {
       setStatus('loading')
       try {
-        setResults(await fetchRecommendations(JSON.parse(requestKey), controller.signal))
+        const data = await fetchRecommendations(JSON.parse(requestKey), controller.signal)
+        setResults(data)
         setStatus('done')
+        onBriefings(data[0]?.actionBriefings ?? [])
       } catch (error) {
         if (error.name !== 'CanceledError') {
           setStatus('error')
+          onBriefings([])
         }
       }
     }, DEBOUNCE_MS)
@@ -40,7 +44,7 @@ export default function RecommendationList({ request, refreshKey }) {
       clearTimeout(timer)
       controller.abort()
     }
-  }, [requestKey, refreshKey])
+  }, [requestKey, refreshKey, onBriefings])
 
   return (
     <section className="panel results">
@@ -54,8 +58,6 @@ export default function RecommendationList({ request, refreshKey }) {
       {status === 'done' && results.length === 0 && (
         <p className="message">일치하는 덱이 없습니다. 상점 기물이나 보유 아이템을 입력해 보세요.</p>
       )}
-
-      {results[0]?.roundTip && <p className="round-banner">{results[0].roundTip}</p>}
 
       <ol className="comp-list">
         {results.map((comp, index) => (

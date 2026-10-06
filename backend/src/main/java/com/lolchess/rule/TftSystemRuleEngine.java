@@ -2,13 +2,14 @@ package com.lolchess.rule;
 
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * [역할] TFT 게임의 고정 시스템 규칙(이자, 레벨별 상점 확률, 라운드 구성)을 계산하는 규칙 엔진.
+ * [역할] TFT 게임의 고정 시스템 규칙(이자, 레벨별 상점 확률, 라운드 구성, 레벨업 타이밍)을 계산하는 규칙 엔진.
  *   DB나 외부 API에 의존하지 않는 순수 계산 로직이며, 상태가 없으므로 싱글톤 빈으로 공유한다.
  *
  * [Data Flow]
@@ -50,6 +51,18 @@ public class TftSystemRuleEngine {
     private static final Pattern STAGE_PATTERN = Pattern.compile("^\\s*(\\d+)-(\\d+)\\s*$");
     private static final int STAGE_ONE_ROUNDS = 4;
     private static final int ROUNDS_PER_STAGE = 7;
+
+    /**
+     * 표준 운영 기준 레벨업 타이밍 (스테이지 순서대로). 해당 라운드에 도달하면 그 레벨을 맞추는 것을 권장한다.
+     */
+    private static final List<LevelTiming> LEVEL_TIMINGS = List.of(
+            new LevelTiming("2-1", 4),
+            new LevelTiming("2-5", 5),
+            new LevelTiming("3-2", 6),
+            new LevelTiming("4-1", 7),
+            new LevelTiming("4-2", 8),
+            new LevelTiming("5-1", 9)
+    );
 
     /**
      * 라운드 종료 시 받는 이자. 보유 골드 10원당 1골드, 최대 5골드.
@@ -113,6 +126,25 @@ public class TftSystemRuleEngine {
         });
     }
 
+    /**
+     * 현재 스테이지 기준으로 이미 도달한 가장 최근 레벨업 타이밍. (예: 3-4 -> 3-2 / 6레벨)
+     * 아직 첫 타이밍(2-1) 전이거나 형식이 잘못된 스테이지면 빈 값.
+     */
+    public Optional<LevelTiming> latestLevelTiming(String stage) {
+        return parseStage(stage).flatMap(current -> LEVEL_TIMINGS.stream()
+                .filter(timing -> parseStage(timing.stage()).map(t -> t.compareTo(current) <= 0).orElse(false))
+                .reduce((first, second) -> second));
+    }
+
+    /**
+     * 레벨업 타이밍 한 개
+     *
+     * @param stage 라운드 (예: "3-2")
+     * @param level 그 라운드에 맞춰야 하는 레벨
+     */
+    public record LevelTiming(String stage, int level) {
+    }
+
     private Optional<StageRound> parseStage(String stage) {
         if (stage == null) {
             return Optional.empty();
@@ -124,6 +156,10 @@ public class TftSystemRuleEngine {
         return Optional.of(new StageRound(Integer.parseInt(matcher.group(1)), Integer.parseInt(matcher.group(2))));
     }
 
-    private record StageRound(int stage, int round) {
+    private record StageRound(int stage, int round) implements Comparable<StageRound> {
+        @Override
+        public int compareTo(StageRound other) {
+            return stage != other.stage ? Integer.compare(stage, other.stage) : Integer.compare(round, other.round);
+        }
     }
 }

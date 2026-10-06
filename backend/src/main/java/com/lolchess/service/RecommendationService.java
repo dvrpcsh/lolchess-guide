@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
  *     --> 덱마다 기물/아이템/티어 점수 계산
  *     --> 매칭 점수(기물+아이템)가 0점인 덱 제외 --> 총점 내림차순 정렬
  *     --> TftSystemRuleEngine으로 덱별 피드백(이자 경고, 확률 팁, 크립 라운드 안내) 생성
+ *     --> 1순위 덱에 대해 ActionableGuideService로 실시간 행동 가이드(actionBriefings) 생성
  *     --> RecommendResponse DTO 목록으로 변환하여 Controller에 반환
  *
  * [점수 규칙]
@@ -80,6 +81,7 @@ public class RecommendationService {
     private final ChampionRepository championRepository;
     private final TftSystemRuleEngine ruleEngine;
     private final ItemRecipeService itemRecipeService;
+    private final ActionableGuideService actionableGuideService;
 
     /**
      * 현재 게임 상황에 맞는 메타 덱을 총점 내림차순으로 반환한다.
@@ -95,16 +97,27 @@ public class RecommendationService {
                 .collect(Collectors.toMap(ChampionEntity::getName, ChampionEntity::getCost, (a, b) -> a));
         String roundTip = buildRoundTip(request.currentStage());
 
-        return metaCompRepository.findAll().stream()
+        List<ScoredComp> ranked = metaCompRepository.findAll().stream()
                 .map(comp -> score(comp, board, shopUnits))
                 .filter(scored -> scored.matchScore() > 0)
                 .sorted(Comparator.comparingInt(ScoredComp::totalScore).reversed()
                         .thenComparing(scored -> scored.comp().getTier())) // 동점이면 상위 티어 우선
-                .map(scored -> scored.toResponse(
-                        buildInterestWarnings(scored.unitsToBuy(), unitCosts, request.currentGold()),
-                        buildProbabilityTips(scored.comp().getCoreUnits(), boardUnits, unitCosts, request.currentLevel()),
-                        roundTip))
                 .toList();
+
+        List<RecommendResponse> responses = new ArrayList<>();
+        for (int rank = 0; rank < ranked.size(); rank++) {
+            ScoredComp scored = ranked.get(rank);
+            // 행동 가이드는 "지금 무엇을 할지"이므로 1순위 덱 기준으로만 만든다
+            List<String> briefings = rank == 0
+                    ? actionableGuideService.buildBriefings(request, scored.comp(), scored.unitsToBuy(), unitCosts)
+                    : List.of();
+            responses.add(scored.toResponse(
+                    buildInterestWarnings(scored.unitsToBuy(), unitCosts, request.currentGold()),
+                    buildProbabilityTips(scored.comp().getCoreUnits(), boardUnits, unitCosts, request.currentLevel()),
+                    roundTip,
+                    briefings));
+        }
+        return responses;
     }
 
     /**
@@ -316,7 +329,8 @@ public class RecommendationService {
             return matchScore + tierBonus;
         }
 
-        RecommendResponse toResponse(List<String> interestWarnings, List<String> probabilityTips, String roundTip) {
+        RecommendResponse toResponse(List<String> interestWarnings, List<String> probabilityTips, String roundTip,
+                                     List<String> actionBriefings) {
             return new RecommendResponse(
                     comp.getName(),
                     comp.getTier().name(),
@@ -326,7 +340,8 @@ public class RecommendationService {
                     comp.getDescription(),
                     interestWarnings,
                     probabilityTips,
-                    roundTip
+                    roundTip,
+                    actionBriefings
             );
         }
     }

@@ -65,6 +65,15 @@ class TftSystemRuleEngineTest {
     }
 
     @Test
+    void 도달한_가장_최근_레벨업_타이밍을_찾는다() {
+        assertThat(engine.latestLevelTiming("1-3")).isEmpty();
+        assertThat(engine.latestLevelTiming("2-1")).contains(new TftSystemRuleEngine.LevelTiming("2-1", 4));
+        assertThat(engine.latestLevelTiming("3-5")).contains(new TftSystemRuleEngine.LevelTiming("3-2", 6));
+        assertThat(engine.latestLevelTiming("4-2")).contains(new TftSystemRuleEngine.LevelTiming("4-2", 8));
+        assertThat(engine.latestLevelTiming("6-3")).contains(new TftSystemRuleEngine.LevelTiming("5-1", 9));
+    }
+
+    @Test
     void 다음_라운드를_계산한다() {
         assertThat(engine.nextRound("3-2")).contains("3-3");
         assertThat(engine.nextRound("1-4")).contains("2-1");

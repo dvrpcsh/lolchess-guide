@@ -25,6 +25,7 @@ import ChampionCodex from './components/ChampionCodex'
 import ItemSelector from './components/ItemSelector'
 import GameStatePanel from './components/GameStatePanel'
 import RecommendationList from './components/RecommendationList'
+import CoachBriefing from './components/CoachBriefing'
 
 const SHOP_SIZE = 5
 
@@ -44,6 +45,7 @@ const SHOP_SIZE = 5
  *   - 서랍 > 상점 / 게임 상태 입력 --> 각 상태 갱신
  *   --> request { boardUnits(이름), placedUnits(이름·성급·장착 아이템), itemCounts(인벤토리), ... }
  *   --> RecommendationList가 POST /api/v1/recommend 재요청 (입력이 바뀔 때마다 실시간)
+ *   --> 응답의 1순위 덱 actionBriefings --> briefings 상태 --> 화면 상단 CoachBriefing 배너
  */
 export default function App() {
   const [champions, setChampions] = useState([])
@@ -58,6 +60,7 @@ export default function App() {
   const [gameState, setGameState] = useState(INITIAL_GAME_STATE)
   const [refreshKey, setRefreshKey] = useState(0)
   const [isDrawerOpen, setIsDrawerOpen] = useState(true)
+  const [briefings, setBriefings] = useState([])
 
   useEffect(() => {
     fetchChampions()
@@ -182,6 +185,8 @@ export default function App() {
           </div>
         </header>
 
+        <CoachBriefing briefings={briefings} />
+
         <main className="layout">
           <ChessBoard
             slots={slots}
@@ -197,7 +202,7 @@ export default function App() {
             onResetBoard={() => setLoadout(resetLoadout())}
             onUnequip={handleUnequip}
           />
-          <RecommendationList request={request} refreshKey={refreshKey} />
+          <RecommendationList request={request} refreshKey={refreshKey} onBriefings={setBriefings} />
         </main>
       </div>
 
