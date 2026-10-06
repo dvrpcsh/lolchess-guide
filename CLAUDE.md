@@ -8,7 +8,7 @@
 
 - **Backend**: Spring Boot 4.1 (Java 17, Gradle), Spring Data JPA, Spring Web MVC, Lombok
 - **Database**: MySQL (`mysql-connector-j`)
-- **Frontend**: React (예정, `frontend/` 디렉터리에 추가 예정)
+- **Frontend**: React 19 + Vite, Axios (`frontend/`)
 
 ### 디렉터리 구조
 
@@ -21,7 +21,7 @@ lolchess/
 │       ├── main/java/com/lolchess/   # 기본 패키지 (LolchessApplication)
 │       ├── main/resources/           # application.properties
 │       └── test/java/com/lolchess/
-├── frontend/                # React 앱 (예정)
+├── frontend/                # React 앱 (Vite)
 ├── CLAUDE.md
 └── 작업일지.md
 ```
@@ -137,6 +137,17 @@ cd backend
 ./gradlew test --tests "com.lolchess.LolchessApplicationTests"   # 특정 테스트 클래스만 실행
 ./gradlew clean build    # 빌드 결과물 삭제 후 재빌드
 ./gradlew build -x test  # 테스트 생략하고 빌드
+```
+
+프론트엔드 명령은 `frontend/` 디렉터리에서 실행한다. 개발 서버는 `/api` 요청을 `http://localhost:8080`으로 프록시한다. (`vite.config.js`)
+
+```bash
+cd frontend
+
+npm install      # 의존성 설치
+npm run dev      # 개발 서버 실행 (http://localhost:5173)
+npm run build    # 프로덕션 빌드 (dist/)
+npm run lint     # oxlint 검사
 ```
 
 ## 작업 규칙
