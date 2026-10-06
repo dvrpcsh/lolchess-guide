@@ -21,6 +21,7 @@ import java.util.Map;
  * @param currentStage 현재 스테이지 (예: "3-2", 미입력 시 null -> 라운드 피드백 생략)
  * @param placedUnits  체스판/벤치 기물의 성급·장착 아이템 상세 (미전송 시 빈 목록 -> 성급/장착 가중치 없음)
  *                     placedUnits의 기물 이름은 boardUnits에도 포함된 것으로 간주한다.
+ * @param playerHp     현재 체력 (1~100, 미전송 시 100) -> 운영 타입과 결합해 피관리 브리핑 생성
  */
 public record RecommendRequest(
         List<String> shopUnits,
@@ -29,8 +30,12 @@ public record RecommendRequest(
         Integer currentLevel,
         Integer currentGold,
         String currentStage,
-        List<PlacedUnitRequest> placedUnits
+        List<PlacedUnitRequest> placedUnits,
+        Integer playerHp
 ) {
+    public static final int MAX_HP = 100;
+    public static final int MIN_HP = 1;
+
     // 클라이언트가 필드를 생략해도 Service에서 null 체크 없이 다룰 수 있도록 빈 컬렉션으로 정규화
     public RecommendRequest {
         shopUnits = shopUnits != null ? shopUnits : List.of();
@@ -39,16 +44,24 @@ public record RecommendRequest(
         placedUnits = placedUnits != null
                 ? placedUnits.stream().filter(u -> u != null && u.name() != null && !u.name().isBlank()).toList()
                 : List.of();
+        playerHp = playerHp == null ? MAX_HP : Math.min(MAX_HP, Math.max(MIN_HP, playerHp));
     }
 
     // 기존 호출부(기물/아이템만 사용)와의 호환용 생성자
     public RecommendRequest(List<String> shopUnits, List<String> boardUnits, Map<String, Integer> itemCounts) {
-        this(shopUnits, boardUnits, itemCounts, null, null, null, null);
+        this(shopUnits, boardUnits, itemCounts, null, null, null, null, null);
     }
 
     // 성급/장착 정보 없이 게임 상태까지 전달하는 호출부용 생성자
     public RecommendRequest(List<String> shopUnits, List<String> boardUnits, Map<String, Integer> itemCounts,
                             Integer currentLevel, Integer currentGold, String currentStage) {
-        this(shopUnits, boardUnits, itemCounts, currentLevel, currentGold, currentStage, null);
+        this(shopUnits, boardUnits, itemCounts, currentLevel, currentGold, currentStage, null, null);
+    }
+
+    // 체력 정보 없이 배치 기물까지 전달하는 호출부용 생성자 (체력은 100으로 간주)
+    public RecommendRequest(List<String> shopUnits, List<String> boardUnits, Map<String, Integer> itemCounts,
+                            Integer currentLevel, Integer currentGold, String currentStage,
+                            List<PlacedUnitRequest> placedUnits) {
+        this(shopUnits, boardUnits, itemCounts, currentLevel, currentGold, currentStage, placedUnits, null);
     }
 }

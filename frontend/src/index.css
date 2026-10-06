@@ -462,3 +462,12 @@ button.unit-item:hover { outline: 1px solid var(--tier-s); }
 .carry-item { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--text-strong); }
 .carry-item img, .carry-item-fallback { flex: none; width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--gold-dim); }
 .carry-item-fallback { display: grid; place-items: center; background: var(--panel); }
+
+/* ---------- 덱 운영 타입 뱃지 / 체력 입력 ---------- */
+.comp-type-badge { flex: none; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; border: 1px solid; white-space: nowrap; }
+.comp-type-badge.is-reroll { color: #ffd257; border-color: rgba(255, 210, 87, 0.55); background: rgba(255, 210, 87, 0.08); }
+.comp-type-badge.is-fast8 { color: var(--cyan); border-color: rgba(79, 209, 224, 0.55); background: rgba(79, 209, 224, 0.08); }
+.comp-type-badge.is-value9 { color: #d6a8ff; border-color: rgba(180, 92, 240, 0.6); background: rgba(180, 92, 240, 0.1); }
+.state-input.hp { width: 64px; color: #8be0a9; }
+.state-input.hp.is-danger { color: var(--tier-s); border-color: var(--tier-s); }
+.coach-badge.is-danger { color: #fff; background: var(--tier-s); border-color: var(--tier-s); }

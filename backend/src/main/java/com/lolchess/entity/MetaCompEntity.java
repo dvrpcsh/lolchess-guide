@@ -62,6 +62,11 @@ public class MetaCompEntity {
     @Column(nullable = false, length = 1)
     private Tier tier;
 
+    // 운영 타입 (리롤 / Fast 8 / 9렙 밸류). 컬럼 추가 이전 행은 NULL일 수 있어 nullable, 기동 시 DataInitializer가 채운다
+    @Enumerated(EnumType.STRING)
+    @Column(length = 10)
+    private CompType compType;
+
     // 덱의 핵심 유닛 이름 목록. 독립적인 생명주기가 없는 값 타입이므로 @ElementCollection으로
     // 별도 테이블에 저장하고, 덱 삭제 시 함께 삭제된다. @OrderColumn으로 입력 순서를 유지한다.
     @ElementCollection
@@ -92,11 +97,12 @@ public class MetaCompEntity {
     private Map<String, List<String>> unitItemMap = new LinkedHashMap<>();
 
     @Builder
-    private MetaCompEntity(String name, Tier tier, List<String> coreUnits, List<String> recommendedItems,
+    private MetaCompEntity(String name, Tier tier, CompType compType, List<String> coreUnits, List<String> recommendedItems,
                            String description, Map<Integer, List<String>> buildUpGuide,
                            Map<String, List<String>> unitItemMap) {
         this.name = name;
         this.tier = tier;
+        this.compType = compType;
         // 외부 리스트 참조를 그대로 보관하지 않도록 방어적 복사 (불변 List.of() 전달 시에도 Hibernate가 수정 가능)
         this.coreUnits = coreUnits != null ? new ArrayList<>(coreUnits) : new ArrayList<>();
         this.recommendedItems = recommendedItems != null ? new ArrayList<>(recommendedItems) : new ArrayList<>();
@@ -106,13 +112,14 @@ public class MetaCompEntity {
     }
 
     /**
-     * 덱 구성(티어, 핵심 기물, 추천 아이템, 설명, 레벨별 빌드업, 기물별 추천 아이템)을 새 값으로 교체한다.
+     * 덱 구성(티어, 운영 타입, 핵심 기물, 추천 아이템, 설명, 레벨별 빌드업, 기물별 추천 아이템)을 새 값으로 교체한다.
      * @ElementCollection 컬렉션은 Hibernate가 추적 중인 인스턴스를 유지한 채 내용만 바꿔야 변경 감지가 정상 동작하고,
      * JSON 컨버터 필드(Map)는 새 인스턴스로 교체해야 변경이 감지된다.
      */
-    public void updateComposition(Tier tier, List<String> coreUnits, List<String> recommendedItems, String description,
+    public void updateComposition(Tier tier, CompType compType, List<String> coreUnits, List<String> recommendedItems, String description,
                                   Map<Integer, List<String>> buildUpGuide, Map<String, List<String>> unitItemMap) {
         this.tier = tier;
+        this.compType = compType;
         this.coreUnits.clear();
         this.coreUnits.addAll(coreUnits);
         this.recommendedItems.clear();
@@ -125,9 +132,10 @@ public class MetaCompEntity {
     /**
      * 저장된 구성이 주어진 값과 완전히 같은지 비교한다. (같으면 불필요한 UPDATE를 생략하기 위함)
      */
-    public boolean hasSameComposition(Tier tier, List<String> coreUnits, List<String> recommendedItems, String description,
+    public boolean hasSameComposition(Tier tier, CompType compType, List<String> coreUnits, List<String> recommendedItems, String description,
                                       Map<Integer, List<String>> buildUpGuide, Map<String, List<String>> unitItemMap) {
         return this.tier == tier
+                && this.compType == compType
                 && this.coreUnits.equals(coreUnits)
                 && this.recommendedItems.equals(recommendedItems)
                 && Objects.equals(this.description, description)

@@ -53,6 +53,9 @@ import java.util.stream.Collectors;
  *                 장착 점수도 같은 방식으로, 분해된 재료가 추천 아이템이면 재료당 +10
  *   - 장착 상한  : 장착 점수는 아이템별로 덱 추천 목록의 요구 개수를 넘지 않는다. (덱 전체 핵심 기물 합산 기준)
  *                 예) 추천 목록에 곡궁이 1개면, 곡궁 2개로 만든 붉은 덩굴정령을 장착해도 곡궁 1개분(+10)만 인정
+ *   - 유틸 아이템: 치유 감소(태양불꽃 망토, 모렐로노미콘)·방어력/마법 저항력 감소(최후의 속삭임, 저녁갑주, 이온 충격기,
+ *                 공허의 지팡이) 아이템을 덱 핵심 기물에 장착했으면 종류당 +15 (같은 종류 중복 장착은 1번만 인정)
+ *                 덱 일치도와 무관한 보너스이므로 결과 포함 여부(매칭 점수)에는 쓰지 않고 총점에만 더한다.
  *   - 티어 점수  : S +10, A +5, B +0
  *   티어 점수는 "현재 상황과의 일치도"가 아니므로, 기물/아이템이 하나도 맞지 않는 덱은
  *   티어와 관계없이 결과에서 제외한다. (빈 요청에 S티어 덱이 무조건 추천되는 것을 방지)
@@ -73,6 +76,10 @@ public class RecommendationService {
     private static final int TWO_STAR_SCORE = 10;
     private static final int THREE_STAR_SCORE = 25;
     private static final int EQUIPPED_ITEM_SCORE = 10;
+    private static final int UTILITY_ITEM_SCORE = 15;
+    // 상대 회복을 줄이거나(치감) 방어력·마법 저항력을 깎는(방깎·마저깎) 팀 유틸 아이템
+    private static final Set<String> UTILITY_ITEMS = Set.of(
+            "태양불꽃 망토", "모렐로노미콘", "최후의 속삭임", "저녁갑주", "이온 충격기", "공허의 지팡이");
 
     private static final int HIGH_COST_THRESHOLD = 4;      // 확률 팁 대상 코스트 (4코 이상)
     private static final int LOW_PROBABILITY_PERCENT = 20; // 이 확률 미만이면 "잘 안 나온다"로 판단
@@ -177,7 +184,14 @@ public class RecommendationService {
                 + itemMatches * ITEM_SCORE
                 + starScore
                 + equippedMatches * EQUIPPED_ITEM_SCORE;
-        return new ScoredComp(comp, matchScore, tierBonus(comp.getTier()), unitsToBuy, matchedItems);
+        // 핵심 기물에 장착된 유틸 아이템 종류 수 (같은 아이템 중복은 1번만)
+        long utilityKinds = coreUnits.stream()
+                .flatMap(unit -> board.equippedItems().getOrDefault(unit, List.of()).stream())
+                .filter(UTILITY_ITEMS::contains)
+                .distinct()
+                .count();
+        int bonus = tierBonus(comp.getTier()) + (int) utilityKinds * UTILITY_ITEM_SCORE;
+        return new ScoredComp(comp, matchScore, bonus, unitsToBuy, matchedItems);
     }
 
     /**
@@ -320,13 +334,13 @@ public class RecommendationService {
      * 점수 계산 중간 결과. Service 내부에서만 사용하며 최종적으로 RecommendResponse로 변환된다.
      *
      * @param matchScore 현재 상황과의 일치 점수 (기물 + 아이템) - 결과 포함 여부 판단에 사용
-     * @param tierBonus  티어 가산점
+     * @param bonus      덱 일치도와 무관한 가산점 (티어 + 유틸 아이템)
      */
-    private record ScoredComp(MetaCompEntity comp, int matchScore, int tierBonus,
+    private record ScoredComp(MetaCompEntity comp, int matchScore, int bonus,
                               List<String> unitsToBuy, List<String> matchedItems) {
 
         int totalScore() {
-            return matchScore + tierBonus;
+            return matchScore + bonus;
         }
 
         RecommendResponse toResponse(List<String> interestWarnings, List<String> probabilityTips, String roundTip,
@@ -334,6 +348,7 @@ public class RecommendationService {
             return new RecommendResponse(
                     comp.getName(),
                     comp.getTier().name(),
+                    comp.getCompType() != null ? comp.getCompType().name() : null,
                     totalScore(),
                     unitsToBuy,
                     List.copyOf(matchedItems),

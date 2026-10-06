@@ -1,6 +1,7 @@
 package com.lolchess.config;
 
 import com.lolchess.entity.ChampionEntity;
+import com.lolchess.entity.CompType;
 import com.lolchess.entity.ItemEntity;
 import com.lolchess.entity.MetaCompEntity;
 import com.lolchess.entity.Tier;
@@ -62,6 +63,7 @@ public class DataInitializer implements ApplicationRunner {
             new CompDefinition(
                     "나무정령 / 지옥불 드레이븐 고밸류",
                     Tier.S,
+                    CompType.VALUE_9,
                     List.of("드레이븐", "자야", "애쉬", "아무무", "마오카이"),
                     List.of("곡궁", "B.F. 대검", "쇠사슬 조끼", "연습용 장갑"),
                     "구인수 필수, 크라켄 및 최후의 속삭임/전역 갑주 조기 제작 추천. 9렙 고밸류 전환 용이.",
@@ -79,6 +81,7 @@ public class DataInitializer implements ApplicationRunner {
             new CompDefinition(
                     "속사포 아펠리오스",
                     Tier.S,
+                    CompType.FAST_8,
                     List.of("아펠리오스", "바루스", "자야", "아무무"),
                     List.of("B.F. 대검", "연습용 장갑", "거인의 허리띠", "쇠사슬 조끼"),
                     "자체 공속 증가로 구인수 제작 금지. Pure AD 및 방템 위주 구성.",
@@ -96,6 +99,7 @@ public class DataInitializer implements ApplicationRunner {
             new CompDefinition(
                     "감시자 아리 모르가나",
                     Tier.A,
+                    CompType.FAST_8,
                     List.of("아리", "모르가나", "아무무", "알룬"),
                     List.of("쓸데없이 큰 지팡이", "여신의 눈물", "거인의 허리띠", "음전자 망토"),
                     "모르가나 역병의 보석 핵심. 감시자 암라인과 유연한 4주문술사 전환 가능.",
@@ -109,7 +113,28 @@ public class DataInitializer implements ApplicationRunner {
                     unitItems(
                             Map.entry("아리", List.of("푸른 파수꾼", "보석 건틀릿", "라바돈의 죽음모자")),
                             Map.entry("모르가나", List.of("모렐로노미콘", "정령의 형상", "적응형 투구")),
-                            Map.entry("알룬", List.of("대천사의 지팡이", "보석 건틀릿", "이온 충격기"))))
+                            Map.entry("알룬", List.of("대천사의 지팡이", "보석 건틀릿", "이온 충격기")))),
+            // 3코스트 이하 주문술사 3성작 리롤 덱 (베이가는 시즌 18에서 1코스트, 카시오페아·피들스틱이 3코스트 주문술사)
+            new CompDefinition(
+                    "주문술사 베이가 리롤",
+                    Tier.A,
+                    CompType.REROLL,
+                    List.of("베이가", "카르마", "르블랑", "카시오페아", "피들스틱", "오른", "알리스타", "렉사이"),
+                    List.of("쓸데없이 큰 지팡이", "쓸데없이 큰 지팡이", "쓸데없이 큰 지팡이", "쓸데없이 큰 지팡이",
+                            "여신의 눈물", "여신의 눈물", "여신의 눈물", "여신의 눈물",
+                            "거인의 허리띠", "거인의 허리띠", "거인의 허리띠", "거인의 허리띠",
+                            "B.F. 대검", "B.F. 대검", "쇠사슬 조끼", "쇠사슬 조끼", "연습용 장갑", "음전자 망토"),
+                    "6렙에서 50원 이자를 유지하며 베이가·르블랑 3성, 7렙에서 카시오페아·피들스틱 3성을 완성. 베이가에게 마나 아이템 우선.",
+                    buildUp(
+                            List.of("베이가", "카르마", "르블랑", "오른"),
+                            List.of("베이가", "카르마", "르블랑", "오른", "렉사이"),
+                            List.of("베이가", "카르마", "르블랑", "오른", "렉사이", "카시오페아"),
+                            List.of("베이가", "카르마", "르블랑", "오른", "렉사이", "카시오페아", "피들스틱"),
+                            List.of("베이가", "카르마", "르블랑", "오른", "렉사이", "카시오페아", "피들스틱", "알리스타")),
+                    unitItems(
+                            Map.entry("베이가", List.of("푸른 파수꾼", "보석 건틀릿", "마법공학 총검")),
+                            Map.entry("카시오페아", List.of("대천사의 지팡이", "모렐로노미콘", "쇼진의 창")),
+                            Map.entry("오른", List.of("가고일 돌갑옷", "워모그의 갑옷", "태양불꽃 망토"))))
     );
 
     // 빌드업 가이드 레벨 범위: 4레벨부터 9레벨까지 순서대로
@@ -136,10 +161,10 @@ public class DataInitializer implements ApplicationRunner {
             if (existing == null) {
                 metaCompRepository.save(def.toEntity());
                 inserted++;
-            } else if (!existing.hasSameComposition(def.tier(), def.coreUnits(), def.recommendedItems(), def.description(),
+            } else if (!existing.hasSameComposition(def.tier(), def.compType(), def.coreUnits(), def.recommendedItems(), def.description(),
                     def.buildUpGuide(), def.unitItemMap())) {
                 // 영속 상태 엔티티이므로 값만 바꾸면 트랜잭션 커밋 시 변경 감지로 UPDATE 된다.
-                existing.updateComposition(def.tier(), def.coreUnits(), def.recommendedItems(), def.description(),
+                existing.updateComposition(def.tier(), def.compType(), def.coreUnits(), def.recommendedItems(), def.description(),
                         def.buildUpGuide(), def.unitItemMap());
                 updated++;
             }
@@ -207,7 +232,7 @@ public class DataInitializer implements ApplicationRunner {
     record SeedFile(String source, String sourceVersion, String collectedAt, List<CompDefinition> comps) {
     }
 
-    record CompDefinition(String name, Tier tier, List<String> coreUnits, List<String> recommendedItems,
+    record CompDefinition(String name, Tier tier, CompType compType, List<String> coreUnits, List<String> recommendedItems,
                                   String description, Map<Integer, List<String>> buildUpGuide,
                                   Map<String, List<String>> unitItemMap) {
 
@@ -215,6 +240,7 @@ public class DataInitializer implements ApplicationRunner {
             return MetaCompEntity.builder()
                     .name(name)
                     .tier(tier)
+                    .compType(compType)
                     .coreUnits(coreUnits)
                     .recommendedItems(recommendedItems)
                     .description(description)

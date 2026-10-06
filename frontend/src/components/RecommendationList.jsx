@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { fetchRecommendations } from '../api/client'
 import CompDetailModal from './CompDetailModal'
+import CompTypeBadge from './CompTypeBadge'
 
 const DEBOUNCE_MS = 300
 
@@ -83,6 +84,7 @@ export default function RecommendationList({ request, refreshKey, onBriefings, c
               <span className="comp-rank">#{index + 1}</span>
               <span className={`tier-badge tier-${comp.tier.toLowerCase()}`}>{comp.tier}</span>
               <h3 className="comp-name">{comp.compName}</h3>
+              <CompTypeBadge compType={comp.compType} />
               <span className="comp-score">{comp.matchScore}<small>점</small></span>
             </header>
             <span className="comp-detail-hint" aria-hidden="true">클릭하여 빌드업·아이템 상세 가이드 보기 ›</span>

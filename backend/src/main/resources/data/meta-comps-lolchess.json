@@ -2,10 +2,12 @@
   "source": "https://lolchess.gg/meta",
   "sourceVersion": "v18.3b (시즌 18)",
   "collectedAt": "2026-10-06",
+  "compTypeNote": "compType은 lolchess.gg 데이터에 없어 덱 이름·최종 배치(성급/코스트) 기준 규칙으로 추정한 값",
   "comps": [
     {
       "name": "장로 드래곤 드레이븐",
       "tier": "S",
+      "compType": "VALUE_9",
       "coreUnits": [
         "타릭",
         "파수꾼",
@@ -75,6 +77,7 @@
     {
       "name": "4전쟁기계 애쉬",
       "tier": "S",
+      "compType": "VALUE_9",
       "coreUnits": [
         "바이",
         "타릭",
@@ -141,6 +144,7 @@
     {
       "name": "6전쟁기계 밸류",
       "tier": "S",
+      "compType": "FAST_8",
       "coreUnits": [
         "요릭",
         "세주아니",
@@ -223,6 +227,7 @@
     {
       "name": "람머스 아지르",
       "tier": "S",
+      "compType": "REROLL",
       "coreUnits": [
         "람머스",
         "피들스틱",
@@ -287,6 +292,7 @@
     {
       "name": "니달리 아펠리오스",
       "tier": "S",
+      "compType": "FAST_8",
       "coreUnits": [
         "파수꾼",
         "아무무",
@@ -362,6 +368,7 @@
     {
       "name": "달빛 다이애나 카직스",
       "tier": "A",
+      "compType": "REROLL",
       "coreUnits": [
         "카직스",
         "헤카림",
@@ -437,6 +444,7 @@
     {
       "name": "나무정령 베이가",
       "tier": "A",
+      "compType": "REROLL",
       "coreUnits": [
         "오른",
         "르블랑",
@@ -486,6 +494,7 @@
     {
       "name": "기원자 모르가나 아리",
       "tier": "A",
+      "compType": "FAST_8",
       "coreUnits": [
         "세트",
         "타릭",
@@ -555,6 +564,7 @@
     {
       "name": "장로 드래곤 애쉬",
       "tier": "A",
+      "compType": "VALUE_9",
       "coreUnits": [
         "타릭",
         "바이",
@@ -630,6 +640,7 @@
     {
       "name": "카직스 아지르",
       "tier": "A",
+      "compType": "REROLL",
       "coreUnits": [
         "바이",
         "세트",
@@ -691,6 +702,7 @@
     {
       "name": "고밸류 드레이븐",
       "tier": "A",
+      "compType": "VALUE_9",
       "coreUnits": [
         "타릭",
         "아무무",
@@ -767,6 +779,7 @@
     {
       "name": "고밸류 알룬",
       "tier": "A",
+      "compType": "VALUE_9",
       "coreUnits": [
         "아무무",
         "마오카이",
@@ -838,6 +851,7 @@
     {
       "name": "처형자 소라카",
       "tier": "A",
+      "compType": "FAST_8",
       "coreUnits": [
         "말파이트",
         "케넨",
@@ -909,6 +923,7 @@
     {
       "name": "처형자 세트",
       "tier": "A",
+      "compType": "FAST_8",
       "coreUnits": [
         "세트",
         "나르",
@@ -986,6 +1001,7 @@
     {
       "name": "개화 애쉬 시비르",
       "tier": "A",
+      "compType": "FAST_8",
       "coreUnits": [
         "세트",
         "바이",
@@ -1063,6 +1079,7 @@
     {
       "name": "개화 애쉬 알룬",
       "tier": "A",
+      "compType": "VALUE_9",
       "coreUnits": [
         "람머스",
         "릴리아",
@@ -1145,6 +1162,7 @@
     {
       "name": "햇빛 유나라 리롤",
       "tier": "A",
+      "compType": "REROLL",
       "coreUnits": [
         "세주아니",
         "요릭",
@@ -1209,6 +1227,7 @@
     {
       "name": "사냥꾼 케이틀린 리롤",
       "tier": "A",
+      "compType": "REROLL",
       "coreUnits": [
         "바위 게",
         "세주아니",
@@ -1273,6 +1292,7 @@
     {
       "name": "사냥꾼 시비르 말파이트",
       "tier": "A",
+      "compType": "FAST_8",
       "coreUnits": [
         "말파이트",
         "니달리",
@@ -1339,6 +1359,7 @@
     {
       "name": "[유물] 마스터 이 렝가",
       "tier": "A",
+      "compType": "REROLL",
       "coreUnits": [
         "돌거북",
         "세트",
@@ -1410,6 +1431,7 @@
     {
       "name": "엄호대 카시오페아",
       "tier": "A",
+      "compType": "REROLL",
       "coreUnits": [
         "레오나",
         "오른",
@@ -1474,6 +1496,7 @@
     {
       "name": "나무정령 이즈리얼",
       "tier": "A",
+      "compType": "FAST_8",
       "coreUnits": [
         "타릭",
         "헤카림",
@@ -1551,6 +1574,7 @@
     {
       "name": "선봉대 아펠리오스",
       "tier": "A",
+      "compType": "FAST_8",
       "coreUnits": [
         "타릭",
         "다이애나",
@@ -1644,6 +1668,7 @@
     {
       "name": "7협곡야수 장로 드래곤",
       "tier": "A",
+      "compType": "REROLL",
       "coreUnits": [
         "돌거북",
         "장로 드래곤",
@@ -1719,6 +1744,7 @@
     {
       "name": "검은 가시 워윅 리롤",
       "tier": "A",
+      "compType": "REROLL",
       "coreUnits": [
         "말파이트",
         "워윅",
@@ -1794,6 +1820,7 @@
     {
       "name": "카밀 아칼리 리롤",
       "tier": "A",
+      "compType": "REROLL",
       "coreUnits": [
         "오른",
         "바루스",
@@ -1867,6 +1894,7 @@
     {
       "name": "선봉대 엘리스",
       "tier": "A",
+      "compType": "REROLL",
       "coreUnits": [
         "파수꾼",
         "엘리스",
@@ -1944,6 +1972,7 @@
     {
       "name": "햇빛 케일 (+나무정령)",
       "tier": "A",
+      "compType": "REROLL",
       "coreUnits": [
         "레오나",
         "라칸",
@@ -2008,6 +2037,7 @@
     {
       "name": "[상징] 치명적인꽃 베이가",
       "tier": "A",
+      "compType": "REROLL",
       "coreUnits": [
         "렉사이",
         "나르",
@@ -2075,6 +2105,7 @@
     {
       "name": "[상징] 날렵이 요정 렝가",
       "tier": "A",
+      "compType": "REROLL",
       "coreUnits": [
         "라칸",
         "타릭",
@@ -2146,6 +2177,7 @@
     {
       "name": "[상징] 요정 트리스타나",
       "tier": "A",
+      "compType": "REROLL",
       "coreUnits": [
         "코부코",
         "라칸",

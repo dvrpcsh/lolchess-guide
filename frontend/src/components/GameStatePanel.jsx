@@ -1,19 +1,21 @@
-import { isValidStage } from '../gameState'
+import { MAX_HP, isValidStage } from '../gameState'
 
 /**
- * [역할] 현재 게임 상태(레벨, 골드, 스테이지) 입력 컴포넌트.
+ * [역할] 현재 게임 상태(레벨, 골드, 스테이지, 체력) 입력 컴포넌트.
  *
  * [Data Flow]
  *   App(gameState 상태) --props--> 입력값 표시
  *   사용자 입력 --> onChange({ ...gameState, [필드]: 값 }) --> App 상태 갱신
- *     --> App이 유효한 값만 currentLevel / currentGold / currentStage로 변환해 추천 요청에 포함
- *     --> 백엔드 TftSystemRuleEngine이 이자 경고·확률 팁·크립 라운드 안내를 계산
+ *     --> App이 유효한 값만 currentLevel / currentGold / currentStage / playerHp로 변환해 추천 요청에 포함
+ *     --> 백엔드 TftSystemRuleEngine이 이자 경고·확률 팁·크립 라운드 안내를,
+ *         ActionableGuideService가 체력 + 덱 운영 타입 기반 피관리 브리핑을 계산
  *   빈 칸은 "입력 안 함"으로 보고 해당 피드백을 받지 않는다.
  */
 export const STAGE_PATTERN = /^\d+-\d+$/
 
 export default function GameStatePanel({ gameState, onChange }) {
-  const { level, gold, stage } = gameState
+  const { level, gold, stage, hp } = gameState
+  const hpValue = hp === '' ? null : Number(hp)
   const update = (field, value) => onChange({ ...gameState, [field]: value })
 
   const stepLevel = (delta) => {
@@ -63,6 +65,20 @@ export default function GameStatePanel({ gameState, onChange }) {
           value={stage}
           aria-invalid={isStageInvalid}
           onChange={(e) => update('stage', e.target.value.replace(/[^\d-]/g, '').slice(0, 4))}
+        />
+      </label>
+
+      <label className="state-field">
+        <span className="state-label">체력 (HP)</span>
+        <input
+          className={`state-input hp ${hpValue !== null && hpValue <= 35 ? 'is-danger' : ''}`}
+          inputMode="numeric"
+          placeholder="100"
+          value={hp}
+          onChange={(e) => {
+            const value = e.target.value.replace(/D/g, '')
+            update('hp', value === '' ? '' : String(Math.min(MAX_HP, Math.max(1, Number(value)))))
+          }}
         />
       </label>
     </section>

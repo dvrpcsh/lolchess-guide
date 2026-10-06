@@ -3,6 +3,7 @@ package com.lolchess.service;
 import com.lolchess.dto.ItemRecipeResponse;
 import com.lolchess.dto.PlacedUnitRequest;
 import com.lolchess.dto.RecommendRequest;
+import com.lolchess.entity.CompType;
 import com.lolchess.entity.MetaCompEntity;
 import com.lolchess.entity.Tier;
 import com.lolchess.rule.TftSystemRuleEngine;
@@ -35,7 +36,9 @@ class ActionableGuideServiceTest {
         ItemRecipeService itemRecipeService = Mockito.mock(ItemRecipeService.class);
         when(itemRecipeService.getRecipes()).thenReturn(List.of(
                 new ItemRecipeResponse("B.F. 대검", "연습용 장갑", "무한의 대검"),
-                new ItemRecipeResponse("쓸데없이 큰 지팡이", "여신의 눈물", "대천사의 지팡이")));
+                new ItemRecipeResponse("쓸데없이 큰 지팡이", "여신의 눈물", "대천사의 지팡이"),
+                new ItemRecipeResponse("곡궁", "연습용 장갑", "최후의 속삭임"),
+                new ItemRecipeResponse("연습용 장갑", "연습용 장갑", "도적의 장갑")));
         guideService = new ActionableGuideService(itemRecipeService, new TftSystemRuleEngine());
     }
 
@@ -78,6 +81,51 @@ class ActionableGuideServiceTest {
         assertThat(guideService.buildBriefings(request, DRAVEN_COMP, List.of(), UNIT_COSTS)).containsExactly(
                 "⬆️ 3-6 라운드입니다. 표준 운영(3-2 6렙)보다 늦었으니 골드를 사용하여 6레벨을 달성하세요.",
                 "💰 다음 라운드는 크립 라운드입니다. 골드를 아껴 이자를 챙기세요.");
+    }
+
+    @Test
+    void 체력이_위험한_Fast8_덱이면_가장_먼저_리롤을_권한다() {
+        RecommendRequest request = hpRequest(30);
+
+        assertThat(guideService.buildBriefings(request, comp(CompType.FAST_8), List.of(), UNIT_COSTS))
+                .containsExactly("🚨 체력이 위험합니다! 50원 이자를 깨고 즉시 8레벨 리롤을 돌려 2성작 보드를 완성하세요!");
+    }
+
+    @Test
+    void 체력이_유복한_9렙_밸류_덱이면_고밸류_전환을_권하고_리롤_덱은_3성작을_권한다() {
+        assertThat(guideService.buildBriefings(hpRequest(80), comp(CompType.VALUE_9), List.of(), UNIT_COSTS))
+                .containsExactly("👑 체력이 유복합니다. 8렙에서 필드 최소 전력만 갖추고 9레벨 고밸류 전환을 노리세요.");
+        assertThat(guideService.buildBriefings(hpRequest(50), comp(CompType.VALUE_9), List.of(), UNIT_COSTS)).isEmpty();
+        assertThat(guideService.buildBriefings(hpRequest(20), comp(CompType.REROLL), List.of(), UNIT_COSTS))
+                .containsExactly("⭐ 50원 이자를 유지하며 해당 레벨(6/7렙)에서 핵심 3성작을 완료하세요.");
+    }
+
+    @Test
+    void 딜러_몫을_빼고_장갑이_2개_이상_남으면_아이템_없는_서브_기물에게_도적의_장갑을_권한다() {
+        // 드레이븐 추천 아이템: 무한의 대검(대검+장갑), 최후의 속삭임(곡궁+장갑) -> 딜러 몫 장갑 2개
+        MetaCompEntity comp = MetaCompEntity.builder().name("드레이븐 덱").tier(Tier.S).compType(CompType.FAST_8)
+                .coreUnits(List.of("드레이븐", "아무무")).recommendedItems(List.of("연습용 장갑"))
+                .unitItemMap(Map.of("드레이븐", List.of("무한의 대검", "최후의 속삭임"))).build();
+        List<PlacedUnitRequest> placed = List.of(
+                new PlacedUnitRequest("드레이븐", 1, List.of()), new PlacedUnitRequest("아무무", 1, List.of()));
+
+        RecommendRequest fourGloves = new RecommendRequest(List.of(), List.of(), Map.of("연습용 장갑", 4),
+                null, null, null, placed);
+        RecommendRequest threeGloves = new RecommendRequest(List.of(), List.of(), Map.of("연습용 장갑", 3),
+                null, null, null, placed);
+
+        assertThat(guideService.buildBriefings(fourGloves, comp, List.of(), UNIT_COSTS)).containsExactly(
+                "🧤 남는 [연습용 장갑] 2개로 [도적의 장갑]을 만들어 [아무무]에게 장착하세요! (핵심 딜러 [드레이븐] 아이템을 챙기고 남는 장갑 활용)");
+        assertThat(guideService.buildBriefings(threeGloves, comp, List.of(), UNIT_COSTS)).isEmpty();
+    }
+
+    private static RecommendRequest hpRequest(int hp) {
+        return new RecommendRequest(List.of(), List.of(), Map.of(), null, null, null, List.of(), hp);
+    }
+
+    private static MetaCompEntity comp(CompType type) {
+        return MetaCompEntity.builder().name(type + " 덱").tier(Tier.A).compType(type)
+                .coreUnits(List.of("드레이븐")).recommendedItems(List.of()).build();
     }
 
     @Test

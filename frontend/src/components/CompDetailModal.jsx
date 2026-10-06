@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import ChampionIcon from './ChampionIcon'
+import CompTypeBadge from './CompTypeBadge'
 
 /**
  * [역할] 추천 덱 상세 가이드 모달. 레벨별(4~9렙) 빌드업 기물과 핵심 기물별 추천 완성 아이템을 보여 준다.
@@ -42,6 +43,7 @@ export default function CompDetailModal({ comp, championByName, itemIconByName, 
         <header className="comp-modal-header">
           <span className={`tier-badge tier-${comp.tier.toLowerCase()}`}>{comp.tier}</span>
           <h2 id="comp-modal-title">{comp.compName}</h2>
+          <CompTypeBadge compType={comp.compType} />
           <button type="button" className="ghost-button comp-modal-close" onClick={() => dialogRef.current.close()}>
             닫기
           </button>

@@ -3,6 +3,7 @@ package com.lolchess.service;
 import com.lolchess.dto.ItemRecipeResponse;
 import com.lolchess.dto.PlacedUnitRequest;
 import com.lolchess.dto.RecommendRequest;
+import com.lolchess.entity.CompType;
 import com.lolchess.entity.MetaCompEntity;
 import com.lolchess.rule.TftSystemRuleEngine;
 import com.lolchess.util.KoreanJosa;
@@ -31,8 +32,11 @@ import java.util.stream.Collectors;
  *     --> 프론트엔드 "실시간 코치 브리핑" 배너
  *
  * [가이드 우선순위] (위에서부터 시급한 순서, 해당하는 것만 포함)
+ *   0) 체력 위기         : 체력 35 이하이고 Fast 8 / 9렙 밸류 덱이면 이자를 깨고 즉시 8렙 리롤 (구루루 챌린저 피관리)
  *   1) 아이템 조합 & 장착 : 인벤토리 재료 2개로 덱에 맞는 완성 아이템을 만들 수 있고, 장착할 핵심 기물이 필드에 있을 때
+ *      + 도적의 장갑     : 핵심 딜러에게 필요한 장갑을 빼고도 연습용 장갑이 2개 이상 남으면 아이템 없는 서브 기물에게 도적의 장갑
  *   2) 레벨업            : 표준 레벨업 타이밍(2-1 4렙 ... 5-1 9렙)에 도달했는데 레벨이 낮을 때
+ *      + 운영 타입 가이드 : 리롤 덱은 50원 유지 3성작, 9렙 밸류 덱은 체력 70 이상이면 9렙 고밸류 전환
  *   3) 상점 매수         : 상점 기물로 2성/3성이 완성되거나, 상점에 덱 핵심 기물이 있을 때
  *   4) 골드 킵           : 다음 라운드가 크립 라운드이거나, 조금만 모으면 이자가 늘어날 때
  */
@@ -45,6 +49,10 @@ public class ActionableGuideService {
     private static final int GOLD_PER_INTEREST = 10;
     private static final int MAX_INTEREST_GOLD = 50;
     private static final int INTEREST_GAP_TO_SAVE = 3; // 다음 이자 구간까지 이 골드 이하로 남으면 "모으기" 권장
+    private static final int DANGER_HP = 35;   // 이하이면 피관리 위기
+    private static final int HEALTHY_HP = 70;  // 이상이면 체력 여유
+    private static final String SPARRING_GLOVES = "연습용 장갑";
+    private static final String THIEFS_GLOVES_FALLBACK = "도적의 장갑";
 
     private final ItemRecipeService itemRecipeService;
     private final TftSystemRuleEngine ruleEngine;
@@ -58,8 +66,11 @@ public class ActionableGuideService {
     public List<String> buildBriefings(RecommendRequest request, MetaCompEntity topComp,
                                        List<String> unitsToBuy, Map<String, Integer> unitCosts) {
         List<String> briefings = new ArrayList<>();
+        buildHpDangerGuide(request, topComp).ifPresent(briefings::add);
         buildItemGuide(request, topComp, unitCosts).ifPresent(briefings::add);
+        buildThiefsGlovesGuide(request, topComp, unitCosts).ifPresent(briefings::add);
         buildLevelGuide(request).ifPresent(briefings::add);
+        buildCompTypeGuide(request, topComp).ifPresent(briefings::add);
         briefings.addAll(buildShopGuides(request, unitsToBuy));
         buildGoldGuide(request).ifPresent(briefings::add);
         return briefings;
@@ -87,6 +98,8 @@ public class ActionableGuideService {
         }
 
         return itemRecipeService.getRecipes().stream()
+                // 도적의 장갑(장갑 + 장갑)은 슬롯 3칸을 모두 차지해 딜러용이 아니므로 별도 가이드(buildThiefsGlovesGuide)에서만 다룬다
+                .filter(r -> !(SPARRING_GLOVES.equals(r.componentA()) && SPARRING_GLOVES.equals(r.componentB())))
                 .filter(r -> recommended.contains(r.result())
                         || (recommended.contains(r.componentA()) && recommended.contains(r.componentB())))
                 .filter(r -> canCraft(r, inventory))
@@ -95,6 +108,92 @@ public class ActionableGuideService {
                 .map(r -> "⚔️ %s %s 합성하여 %s 만들고 [%s]에게 장착하세요!".formatted(
                         KoreanJosa.andOf(r.componentA()), KoreanJosa.objectOf(r.componentB()),
                         KoreanJosa.objectOf(r.result()), target.get()));
+    }
+
+    /**
+     * 0) 체력이 위험한데 고레벨을 노리는 덱(Fast 8 / 9렙 밸류)이면 이자를 포기하고 즉시 전력을 올리게 한다.
+     */
+    private Optional<String> buildHpDangerGuide(RecommendRequest request, MetaCompEntity topComp) {
+        CompType type = topComp.getCompType();
+        boolean highLevelComp = type == CompType.FAST_8 || type == CompType.VALUE_9;
+        if (highLevelComp && request.playerHp() <= DANGER_HP) {
+            return Optional.of("🚨 체력이 위험합니다! 50원 이자를 깨고 즉시 8레벨 리롤을 돌려 2성작 보드를 완성하세요!");
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * 2-1) 운영 타입별 기본 운영 가이드.
+     *   - 리롤 덱: 이자를 유지하며 낮은 레벨에서 3성작
+     *   - 9렙 밸류 덱: 체력이 넉넉하면 8렙 최소 전력으로 버티고 9렙 고밸류 전환 (체력 위기면 0)번 가이드가 대신 나온다)
+     */
+    private Optional<String> buildCompTypeGuide(RecommendRequest request, MetaCompEntity topComp) {
+        CompType type = topComp.getCompType();
+        if (type == CompType.REROLL) {
+            return Optional.of("⭐ 50원 이자를 유지하며 해당 레벨(6/7렙)에서 핵심 3성작을 완료하세요.");
+        }
+        if (type == CompType.VALUE_9 && request.playerHp() >= HEALTHY_HP) {
+            return Optional.of("👑 체력이 유복합니다. 8렙에서 필드 최소 전력만 갖추고 9레벨 고밸류 전환을 노리세요.");
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * 1-1) 핵심 딜러(덱 기물별 아이템 가이드의 첫 기물)에게 필요한 연습용 장갑을 빼고도 2개 이상 남으면,
+     *      아이템이 없는 다른 핵심 기물(없으면 다른 배치 기물)에게 도적의 장갑을 만들어 주도록 권한다.
+     *      도적의 장갑은 아이템 슬롯 3칸을 모두 차지하므로 아이템이 하나도 없는 기물만 대상으로 한다.
+     */
+    private Optional<String> buildThiefsGlovesGuide(RecommendRequest request, MetaCompEntity topComp,
+                                                    Map<String, Integer> unitCosts) {
+        int gloves = request.itemCounts().entrySet().stream()
+                .filter(e -> e.getKey() != null && SPARRING_GLOVES.equals(e.getKey().trim()) && e.getValue() != null)
+                .mapToInt(Map.Entry::getValue).sum();
+        if (gloves < 2) {
+            return Optional.empty();
+        }
+
+        List<ItemRecipeResponse> recipes = itemRecipeService.getRecipes();
+        Map<String, List<String>> componentsByCompleted = recipes.stream()
+                .collect(Collectors.toMap(ItemRecipeResponse::result,
+                        r -> List.of(r.componentA(), r.componentB()), (a, b) -> a));
+        Set<String> placedNames = request.placedUnits().stream().map(u -> u.name().trim())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        // 핵심 딜러: 기물별 아이템 가이드 중 필드에 있는 첫 기물 (없으면 가이드의 첫 기물)
+        Map<String, List<String>> unitItemMap = topComp.getUnitItemMap();
+        Optional<String> carry = unitItemMap.keySet().stream().filter(placedNames::contains).findFirst()
+                .or(() -> unitItemMap.keySet().stream().findFirst());
+
+        // 딜러가 아직 장착하지 않은 추천 아이템에 들어가는 연습용 장갑 수
+        List<String> carryEquipped = carry.map(name -> request.placedUnits().stream()
+                .filter(u -> u.name().trim().equals(name))
+                .flatMap(u -> u.items().stream()).toList()).orElse(List.of());
+        long glovesForCarry = carry.map(name -> unitItemMap.get(name).stream()
+                .filter(item -> !carryEquipped.contains(item))
+                .flatMap(item -> componentsByCompleted.getOrDefault(item, List.of()).stream())
+                .filter(SPARRING_GLOVES::equals)
+                .count()).orElse(0L);
+        if (gloves - glovesForCarry < 2) {
+            return Optional.empty();
+        }
+
+        List<String> coreUnits = topComp.getCoreUnits();
+        Optional<String> target = request.placedUnits().stream()
+                .filter(u -> u.items().isEmpty() && carry.map(c -> !c.equals(u.name().trim())).orElse(true))
+                .map(u -> u.name().trim())
+                .distinct()
+                .max(Comparator.comparing((String name) -> coreUnits.contains(name)) // 핵심 기물 우선
+                        .thenComparingInt(name -> unitCosts.getOrDefault(name, 0)));
+        if (target.isEmpty()) {
+            return Optional.empty();
+        }
+
+        String thiefsGloves = recipes.stream()
+                .filter(r -> SPARRING_GLOVES.equals(r.componentA()) && SPARRING_GLOVES.equals(r.componentB()))
+                .map(ItemRecipeResponse::result).findFirst().orElse(THIEFS_GLOVES_FALLBACK);
+        String carryNote = carry.map(c -> " (핵심 딜러 [%s] 아이템을 챙기고 남는 장갑 활용)".formatted(c)).orElse("");
+        return Optional.of("🧤 남는 [%s] 2개로 %s 만들어 [%s]에게 장착하세요!%s".formatted(
+                SPARRING_GLOVES, KoreanJosa.objectOf(thiefsGloves), target.get(), carryNote));
     }
 
     private boolean canCraft(ItemRecipeResponse recipe, Map<String, Integer> inventory) {

@@ -12,6 +12,7 @@ import java.util.Map;
  *
  * @param compName         덱 이름
  * @param tier             덱 티어 ("S" / "A" / "B")
+ * @param compType         운영 타입 ("REROLL" / "FAST_8" / "VALUE_9", 미지정이면 null)
  * @param matchScore       기물 + 아이템 + 티어 점수의 총합 (높을수록 현재 상황에 적합)
  * @param unitsToBuy       현재 상점에서 매수하면 좋은 이 덱의 핵심 기물
  * @param matchedItems     보유 아이템 중 이 덱의 추천 아이템과 일치하는 목록
@@ -26,6 +27,7 @@ import java.util.Map;
 public record RecommendResponse(
         String compName,
         String tier,
+        String compType,
         int matchScore,
         List<String> unitsToBuy,
         List<String> matchedItems,

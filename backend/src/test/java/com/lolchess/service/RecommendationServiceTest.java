@@ -167,6 +167,16 @@ class RecommendationServiceTest {
         assertThat(scoreOf(service.recommend(request), "A덱")).isEqualTo(70);
     }
 
+    @Test
+    void 핵심_기물에_치감_방깎_유틸_아이템을_장착하면_종류당_15점을_더한다() {
+        // 드레이븐(S덱 핵심)에 최후의 속삭임 2개 + 모렐로노미콘 -> 유틸 2종류(중복 1번만) = +30
+        RecommendRequest request = new RecommendRequest(List.of(), List.of(), Map.of(), null, null, null,
+                List.of(new PlacedUnitRequest("드레이븐", 1, List.of("최후의 속삭임", "최후의 속삭임", "모렐로노미콘"))));
+
+        // 보유 20 + S 10 + 유틸 30 = 60 (S덱 추천 아이템과는 일치하지 않음)
+        assertThat(scoreOf(service.recommend(request), "S덱")).isEqualTo(60);
+    }
+
     private static int scoreOf(List<RecommendResponse> results, String compName) {
         return results.stream().filter(r -> r.compName().equals(compName)).findFirst().orElseThrow().matchScore();
     }

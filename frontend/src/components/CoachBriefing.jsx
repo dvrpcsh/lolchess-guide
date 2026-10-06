@@ -1,6 +1,11 @@
 // 가이드 문장 앞의 이모지로 종류를 판별해 뱃지를 붙인다 (백엔드 ActionableGuideService의 문장 형식 기준)
+// 더 구체적인 접두어를 먼저 둔다 (예: '⭐ 50원'(리롤 운영)과 '⭐ 상점'(2성 완성) 구분)
 const CATEGORIES = [
+  { prefix: '🚨', label: '피관리', className: 'is-danger' },
   { prefix: '⚔️', label: '아이템', className: 'is-item' },
+  { prefix: '🧤', label: '도적의 장갑', className: 'is-item' },
+  { prefix: '👑', label: '운영', className: 'is-level' },
+  { prefix: '⭐ 50원', label: '리롤 운영', className: 'is-level' },
   { prefix: '⬆️', label: '레벨업', className: 'is-level' },
   { prefix: '🌟', label: '3성 완성', className: 'is-shop' },
   { prefix: '⭐', label: '2성 완성', className: 'is-shop' },
